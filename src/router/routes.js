@@ -23,7 +23,12 @@ import OperationsPage from "src/pages/OperationsPage.vue";
 import UsersListPage from "src/pages/UsersListPage.vue";
 
 const routes = [
-  { path: "/login", component: LoginPage, meta: { public: true } },
+  {
+    path: "/login",
+    component: PublicLayout,
+    meta: { public: true },
+    children: [{ path: "", component: LoginPage }]
+  },
   {
     path: "/events/:id/signup",
     component: PublicLayout,
