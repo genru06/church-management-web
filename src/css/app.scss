@@ -1,0 +1,13 @@
+body {
+  background: #f5f7fb;
+}
+
+@import "./entity-ui.scss";
+
+.q-page {
+  min-height: calc(100vh - 60px);
+}
+
+.q-card {
+  border-radius: 12px;
+}

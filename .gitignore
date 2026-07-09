@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Quasar build output
+.quasar/
+dist/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo

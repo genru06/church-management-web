@@ -1,0 +1,637 @@
+<template>
+  <q-page class="entity-page">
+    <header class="entity-page__header">
+      <div class="entity-page__heading">
+        <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push('/events')" />
+        <h1 class="entity-page__title">{{ dashboard.event?.name || "Event dashboard" }}</h1>
+      </div>
+      <div class="row q-gutter-sm">
+        <q-btn
+          dense
+          unelevated
+          no-caps
+          color="primary"
+          icon="qr_code_scanner"
+          label="Scan attendance"
+          @click="router.push(`/events/${eventId}/scan`)"
+        />
+        <q-btn
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="fact_check"
+          label="Attendance sheet"
+          @click="router.push(`/events/${eventId}/attendance`)"
+        />
+        <q-btn
+          v-if="registrationOpen"
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="qr_code_2"
+          label="Registration QR"
+          @click="registrationQrDialogOpen = true"
+        />
+        <q-btn dense outline no-caps color="grey-8" icon="edit" label="Edit event" @click="editDialogOpen = true" />
+      </div>
+    </header>
+
+    <q-inner-loading :showing="loading">
+      <q-spinner size="36px" color="primary" />
+    </q-inner-loading>
+
+    <template v-if="dashboard.event">
+      <section class="event-dashboard__stats row q-col-gutter-sm q-mb-md">
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Participants</span>
+            <span class="event-stat-card__value">{{ dashboard.stats.participantCount }}</span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Expected</span>
+            <span class="event-stat-card__value">{{ dashboard.stats.expectedParticipants || "—" }}</span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Attended</span>
+            <span class="event-stat-card__value">{{ dashboard.stats.attendedCount }}</span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Attendance</span>
+            <span class="event-stat-card__value">{{ dashboard.stats.attendanceRate }}%</span>
+          </div>
+        </div>
+        <div v-if="hasRegistrationFee" class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Registration</span>
+            <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.registrationCollected) }}</span>
+          </div>
+        </div>
+        <div v-if="showTotalCollected" class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Total collected</span>
+            <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.totalCollected) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="entity-page__panel q-mb-md">
+        <div class="event-dashboard__section-header">
+          <h2>Event details</h2>
+        </div>
+        <div class="event-dashboard__details">
+          <dl class="entity-details">
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Date</dt>
+              <dd class="entity-details__value">{{ formatDate(dashboard.event.eventDate) }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Time</dt>
+              <dd class="entity-details__value">{{ formatEventTime(dashboard.event.eventTime) }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Location</dt>
+              <dd class="entity-details__value">{{ dashboard.event.location }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Status</dt>
+              <dd class="entity-details__value">
+                <q-badge :color="statusColor(dashboard.event.status)" :label="dashboard.event.status" />
+              </dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Type</dt>
+              <dd class="entity-details__value">{{ dashboard.event.eventType }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Registration fee</dt>
+              <dd class="entity-details__value">
+                {{ dashboard.event.registrationFee > 0 ? formatCurrency(dashboard.event.registrationFee) : "Free" }}
+              </dd>
+            </div>
+            <div class="entity-details__item entity-details__item--full">
+              <dt class="entity-details__label">Description</dt>
+              <dd class="entity-details__value">{{ dashboard.event.description }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Organizer</dt>
+              <dd class="entity-details__value">{{ dashboard.event.organizer || "—" }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Contact</dt>
+              <dd class="entity-details__value">
+                {{ dashboard.event.contactPerson || "—" }}
+                <span v-if="dashboard.event.contactEmail"> · {{ dashboard.event.contactEmail }}</span>
+              </dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Tags</dt>
+              <dd class="entity-details__value">{{ dashboard.event.tags || "—" }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Created at</dt>
+              <dd class="entity-details__value">{{ formatDateTime(dashboard.event.createdAt) }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Updated at</dt>
+              <dd class="entity-details__value">{{ formatDateTime(dashboard.event.updatedAt) }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Created by</dt>
+              <dd class="entity-details__value">{{ dashboard.event.createdByName || "—" }}</dd>
+            </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Updated by</dt>
+              <dd class="entity-details__value">{{ dashboard.event.updatedByName || "—" }}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section v-if="registrationOpen" class="entity-page__panel q-mb-md">
+        <div class="event-dashboard__section-header">
+          <h2>Registration link</h2>
+          <q-badge color="positive" label="Active" />
+        </div>
+        <div class="event-dashboard__registration">
+          <q-input
+            :model-value="registrationUrl"
+            dense
+            outlined
+            readonly
+            label="Public registration URL"
+            class="event-dashboard__registration-input"
+          >
+            <template #append>
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="content_copy"
+                label="Copy"
+                @click="copyRegistrationLink"
+              />
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="open_in_new"
+                label="Open"
+                :href="registrationUrl"
+                target="_blank"
+              />
+            </template>
+          </q-input>
+          <p class="event-dashboard__registration-note">
+            Share this link or QR code so participants can scan to register.
+          </p>
+
+          <div class="event-dashboard__registration-qr q-mt-md">
+            <EventRegistrationQrCard
+              :event-id="eventId"
+              :event="dashboard.event"
+              :size="200"
+              :show-fullscreen="true"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="entity-page__panel q-mb-md">
+        <div class="event-dashboard__section-header">
+          <h2>Participants</h2>
+          <q-btn dense unelevated no-caps color="primary" icon="person_add" label="Add participant" @click="openParticipantDialog" />
+        </div>
+        <q-table
+          :rows="dashboard.participants"
+          :columns="participantColumns"
+          row-key="id"
+          flat
+          dense
+          :pagination="{ rowsPerPage: 10 }"
+          class="entity-table"
+        >
+          <template #body-cell-churchName="props">
+            <q-td :props="props">
+              <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-lifegroupName="props">
+            <q-td :props="props">
+              <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-registrationPaid="props">
+            <q-td :props="props">
+              <q-badge
+                :color="props.row.registrationPaid ? 'positive' : 'warning'"
+                :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
+              />
+              <q-btn
+                v-if="!props.row.registrationPaid"
+                flat
+                dense
+                no-caps
+                size="sm"
+                color="primary"
+                label="Pay link"
+                class="q-ml-xs"
+                @click="copyPayLink(props.row)"
+              />
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" class="entity-table__actions">
+              <q-btn flat dense round size="sm" color="grey-7" icon="edit" @click="editParticipant(props.row)">
+                <q-tooltip>Edit</q-tooltip>
+              </q-btn>
+              <q-btn flat dense round size="sm" color="grey-7" icon="delete_outline" @click="removeParticipant(props.row)">
+                <q-tooltip>Remove</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </section>
+
+      <section v-if="dashboard.event.allowPledges" class="entity-page__panel">
+        <div class="event-dashboard__section-header">
+          <h2>Pledges</h2>
+          <q-btn dense unelevated no-caps color="primary" icon="volunteer_activism" label="Add pledge" @click="openPledgeDialog" />
+        </div>
+        <q-table
+          :rows="dashboard.pledges"
+          :columns="pledgeColumns"
+          row-key="id"
+          flat
+          dense
+          :pagination="{ rowsPerPage: 10 }"
+          class="entity-table"
+        >
+          <template #body-cell-amount="props">
+            <q-td :props="props">{{ formatCurrency(props.row.amount) }}</q-td>
+          </template>
+          <template #body-cell-paid="props">
+            <q-td :props="props">
+              <q-badge :color="props.row.paid ? 'positive' : 'warning'" :label="props.row.paid ? 'Paid' : 'Pending'" />
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" class="entity-table__actions">
+              <q-btn flat dense round size="sm" color="grey-7" icon="edit" @click="editPledge(props.row)">
+                <q-tooltip>Edit</q-tooltip>
+              </q-btn>
+              <q-btn flat dense round size="sm" color="grey-7" icon="delete_outline" @click="removePledge(props.row)">
+                <q-tooltip>Delete</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </section>
+    </template>
+
+    <EventFormDialog v-model="editDialogOpen" mode="edit" :event-id="eventId" @saved="onEventSaved" />
+
+    <EventParticipantFormDialog
+      v-model="participantDialogOpen"
+      :mode="participantMode"
+      :event-id="eventId"
+      :participant="editingParticipant"
+      @saved="loadDashboard"
+    />
+
+    <EventRegistrationQrDialog
+      v-model="registrationQrDialogOpen"
+      :event-id="eventId"
+      :event="dashboard.event"
+    />
+
+    <q-dialog v-model="pledgeDialogOpen" persistent>
+      <q-card class="entity-dialog">
+        <header class="entity-dialog__header">
+          <div>
+            <h2 class="entity-dialog__title">{{ pledgeMode === 'create' ? 'Add pledge' : 'Edit pledge' }}</h2>
+          </div>
+          <q-btn flat round dense icon="close" color="grey-7" @click="pledgeDialogOpen = false" />
+        </header>
+        <q-separator />
+        <q-card-section class="entity-dialog__body">
+          <q-form ref="pledgeFormRef" class="entity-dialog__form">
+            <div class="row q-col-gutter-sm">
+              <div class="col-12">
+                <q-input v-model="pledgeForm.pledgerName" label="Pledger name *" dense outlined :rules="[requiredRule]" />
+              </div>
+              <div class="col-12 col-sm-6">
+                <q-input v-model="pledgeForm.email" type="email" label="Email" dense outlined />
+              </div>
+              <div class="col-12 col-sm-6">
+                <q-input v-model.number="pledgeForm.amount" type="number" min="0" step="0.01" label="Amount *" dense outlined prefix="₱" :rules="[requiredRule]" />
+              </div>
+              <div class="col-12">
+                <q-toggle v-model="pledgeForm.paid" label="Mark as paid" dense />
+              </div>
+            </div>
+          </q-form>
+        </q-card-section>
+        <q-separator />
+        <footer class="entity-dialog__footer">
+          <q-btn flat no-caps label="Cancel" color="grey-8" @click="pledgeDialogOpen = false" />
+          <q-btn unelevated no-caps color="primary" label="Save" :loading="pledgeSaving" @click="savePledge" />
+        </footer>
+      </q-card>
+    </q-dialog>
+  </q-page>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useQuasar } from "quasar";
+import { api } from "src/boot/axios";
+import EventFormDialog from "src/components/EventFormDialog.vue";
+import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
+import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
+import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
+import {
+  getEventSignupUrl,
+  isRegistrationOpen
+} from "src/utils/eventRegistration";
+import { formatEventTime } from "src/utils/eventTime";
+
+const props = defineProps({
+  id: { type: [String, Number], required: true }
+});
+
+const $q = useQuasar();
+const route = useRoute();
+const router = useRouter();
+const eventId = props.id || route.params.id;
+
+const loading = ref(false);
+const dashboard = ref({ event: null, participants: [], pledges: [], stats: {} });
+const editDialogOpen = ref(false);
+const registrationQrDialogOpen = ref(false);
+const participantDialogOpen = ref(false);
+const participantMode = ref("create");
+const editingParticipant = ref(null);
+const pledgeDialogOpen = ref(false);
+const pledgeMode = ref("create");
+const pledgeSaving = ref(false);
+const editingPledgeId = ref(null);
+const pledgeFormRef = ref(null);
+
+const requiredRule = (val) => !!val || "Required";
+
+const pledgeForm = ref({
+  pledgerName: "",
+  email: "",
+  amount: null,
+  paid: false
+});
+
+const participantColumns = computed(() => {
+  const columns = [
+    { name: "lastName", label: "Last name", field: "lastName", align: "left", sortable: true },
+    { name: "firstName", label: "First name", field: "firstName", align: "left", sortable: true },
+    { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
+    { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true }
+  ];
+
+  if (Number(dashboard.value.event?.registrationFee || 0) > 0) {
+    columns.push({
+      name: "registrationPaid",
+      label: "PAID",
+      field: "registrationPaid",
+      align: "left"
+    });
+  }
+
+  columns.push({ name: "actions", label: "", field: "actions", align: "right" });
+  return columns;
+});
+
+const registrationUrl = computed(() => getEventSignupUrl(eventId));
+const registrationOpen = computed(() => isRegistrationOpen(dashboard.value.event));
+const hasRegistrationFee = computed(() => Number(dashboard.value.event?.registrationFee || 0) > 0);
+const showTotalCollected = computed(
+  () => hasRegistrationFee.value || !!dashboard.value.event?.allowPledges
+);
+
+const pledgeColumns = [
+  { name: "pledgerName", label: "Pledger", field: "pledgerName", align: "left", sortable: true },
+  { name: "email", label: "Email", field: "email", align: "left" },
+  { name: "amount", label: "Amount", field: "amount", align: "right", sortable: true },
+  { name: "paid", label: "Status", field: "paid", align: "left" },
+  { name: "actions", label: "", field: "actions", align: "right" }
+];
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value || 0);
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString();
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function statusColor(status) {
+  const map = { draft: "grey", published: "blue", ongoing: "orange", completed: "positive", cancelled: "negative" };
+  return map[status] || "grey";
+}
+
+function copyPayLink(participant) {
+  const url = `${window.location.origin}/events/${eventId}/register/${participant.id}`;
+  navigator.clipboard?.writeText(url);
+  $q.notify({ type: "info", message: "Payment link copied to clipboard." });
+}
+
+function copyRegistrationLink() {
+  if (!registrationOpen.value) return;
+  navigator.clipboard?.writeText(registrationUrl.value);
+  $q.notify({ type: "positive", message: "Registration link copied to clipboard." });
+}
+
+function openParticipantDialog() {
+  participantMode.value = "create";
+  editingParticipant.value = null;
+  participantDialogOpen.value = true;
+}
+
+function editParticipant(row) {
+  participantMode.value = "edit";
+  editingParticipant.value = row;
+  participantDialogOpen.value = true;
+}
+
+function removeParticipant(row) {
+  $q.dialog({
+    title: "Remove participant",
+    message: `Remove ${row.fullName}?`,
+    cancel: true,
+    persistent: true
+  }).onOk(async () => {
+    await api.delete(`/events/${eventId}/participants/${row.id}`);
+    $q.notify({ type: "positive", message: "Participant removed." });
+    loadDashboard();
+  });
+}
+
+function openPledgeDialog() {
+  pledgeMode.value = "create";
+  editingPledgeId.value = null;
+  pledgeForm.value = { pledgerName: "", email: "", amount: null, paid: false };
+  pledgeDialogOpen.value = true;
+}
+
+function editPledge(row) {
+  pledgeMode.value = "edit";
+  editingPledgeId.value = row.id;
+  pledgeForm.value = {
+    pledgerName: row.pledgerName,
+    email: row.email || "",
+    amount: row.amount,
+    paid: row.paid
+  };
+  pledgeDialogOpen.value = true;
+}
+
+async function savePledge() {
+  const valid = await pledgeFormRef.value?.validate();
+  if (!valid) return;
+
+  pledgeSaving.value = true;
+  try {
+    if (pledgeMode.value === "create") {
+      await api.post(`/events/${eventId}/pledges`, pledgeForm.value);
+    } else {
+      await api.put(`/events/${eventId}/pledges/${editingPledgeId.value}`, pledgeForm.value);
+    }
+    pledgeDialogOpen.value = false;
+    $q.notify({ type: "positive", message: "Pledge saved." });
+    loadDashboard();
+  } catch (err) {
+    const message = err?.response?.data?.message || "Failed to save pledge.";
+    $q.notify({ type: "negative", message: Array.isArray(message) ? message[0] : message });
+  } finally {
+    pledgeSaving.value = false;
+  }
+}
+
+function removePledge(row) {
+  $q.dialog({
+    title: "Delete pledge",
+    message: `Delete pledge from ${row.pledgerName}?`,
+    cancel: true,
+    persistent: true
+  }).onOk(async () => {
+    await api.delete(`/events/${eventId}/pledges/${row.id}`);
+    $q.notify({ type: "positive", message: "Pledge deleted." });
+    loadDashboard();
+  });
+}
+
+function onEventSaved(data) {
+  dashboard.value.event = { ...dashboard.value.event, ...data };
+}
+
+async function loadDashboard() {
+  loading.value = true;
+  try {
+    const { data } = await api.get(`/events/${eventId}/dashboard`);
+    dashboard.value = data;
+  } catch {
+    $q.notify({ type: "negative", message: "Failed to load event dashboard." });
+    router.push("/events");
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(loadDashboard);
+</script>
+
+<style scoped lang="scss">
+.event-dashboard__stats {
+  margin-top: 4px;
+}
+
+.event-stat-card {
+  background: #fff;
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 64px;
+}
+
+.event-stat-card__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b93a1;
+}
+
+.event-stat-card__value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.event-dashboard__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef1f6;
+
+  h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1a1a2e;
+  }
+}
+
+.event-dashboard__details {
+  padding: 12px;
+}
+
+.event-dashboard__registration {
+  padding: 12px;
+}
+
+.event-dashboard__registration-input {
+  width: 100%;
+}
+
+.event-dashboard__registration-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.event-dashboard__registration-note--closed {
+  color: #9a3412;
+}
+
+.event-dashboard__registration-qr {
+  border-top: 1px solid #eef1f6;
+  padding-top: 12px;
+}
+</style>
