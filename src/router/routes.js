@@ -20,22 +20,26 @@ import EventRegistrationPage from "src/pages/EventRegistrationPage.vue";
 import EventSignupPage from "src/pages/EventSignupPage.vue";
 import EventSignupQrPage from "src/pages/EventSignupQrPage.vue";
 import OperationsPage from "src/pages/OperationsPage.vue";
+import UsersListPage from "src/pages/UsersListPage.vue";
 
 const routes = [
-  { path: "/login", component: LoginPage },
+  { path: "/login", component: LoginPage, meta: { public: true } },
   {
     path: "/events/:id/signup",
     component: PublicLayout,
+    meta: { public: true },
     children: [{ path: "", component: EventSignupPage, props: (route) => ({ id: route.params.id }) }]
   },
   {
     path: "/events/:id/signup-qr",
     component: PublicLayout,
+    meta: { public: true },
     children: [{ path: "", component: EventSignupQrPage, props: (route) => ({ id: route.params.id }) }]
   },
   {
     path: "/events/:id/register/:participantId",
     component: PublicLayout,
+    meta: { public: true },
     children: [
       {
         path: "",
@@ -49,25 +53,26 @@ const routes = [
     component: MainLayout,
     children: [
       { path: "", redirect: "/dashboard" },
-      { path: "dashboard", component: DashboardPage },
-      { path: "members", component: MembersListPage },
-      { path: "members/add", component: MemberFormPage, props: { mode: "create" } },
-      { path: "members/:id", component: MemberDetailsPage, props: true },
-      { path: "members/:id/edit", component: MemberFormPage, props: route => ({ mode: "edit", id: route.params.id }) },
-      { path: "churches", component: ChurchesListPage },
-      { path: "churches/add", component: ChurchFormPage, props: { mode: "create" } },
-      { path: "churches/:id", component: ChurchDetailsPage, props: true },
-      { path: "churches/:id/edit", component: ChurchFormPage, props: route => ({ mode: "edit", id: route.params.id }) },
-      { path: "lifegroups", component: LifeGroupsListPage },
-      { path: "lifegroups/add", component: LifeGroupFormPage, props: { mode: "create" } },
-      { path: "lifegroups/:id", component: LifeGroupDetailsPage, props: true },
-      { path: "lifegroups/:id/edit", component: LifeGroupFormPage, props: route => ({ mode: "edit", id: route.params.id }) },
-      { path: "attendance", component: AttendancePage },
-      { path: "events", component: EventsListPage },
-      { path: "events/:id", component: EventDashboardPage, props: true },
-      { path: "events/:id/attendance", component: EventAttendancePage, props: true },
-      { path: "events/:id/scan", component: EventScanPage, props: true },
-      { path: "operations", component: OperationsPage }
+      { path: "dashboard", component: DashboardPage, meta: { page: "dashboard" } },
+      { path: "members", component: MembersListPage, meta: { page: "members" } },
+      { path: "members/add", component: MemberFormPage, props: { mode: "create" }, meta: { page: "members" } },
+      { path: "members/:id", component: MemberDetailsPage, props: true, meta: { page: "members" } },
+      { path: "members/:id/edit", component: MemberFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "members" } },
+      { path: "churches", component: ChurchesListPage, meta: { page: "churches" } },
+      { path: "churches/add", component: ChurchFormPage, props: { mode: "create" }, meta: { page: "churches" } },
+      { path: "churches/:id", component: ChurchDetailsPage, props: true, meta: { page: "churches" } },
+      { path: "churches/:id/edit", component: ChurchFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "churches" } },
+      { path: "lifegroups", component: LifeGroupsListPage, meta: { page: "lifegroups" } },
+      { path: "lifegroups/add", component: LifeGroupFormPage, props: { mode: "create" }, meta: { page: "lifegroups" } },
+      { path: "lifegroups/:id", component: LifeGroupDetailsPage, props: true, meta: { page: "lifegroups" } },
+      { path: "lifegroups/:id/edit", component: LifeGroupFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "lifegroups" } },
+      { path: "attendance", component: AttendancePage, meta: { page: "attendance" } },
+      { path: "events", component: EventsListPage, meta: { page: "events" } },
+      { path: "events/:id", component: EventDashboardPage, props: true, meta: { page: "events" } },
+      { path: "events/:id/attendance", component: EventAttendancePage, props: true, meta: { page: "events" } },
+      { path: "events/:id/scan", component: EventScanPage, props: true, meta: { page: "events" } },
+      { path: "operations", component: OperationsPage, meta: { page: "operations" } },
+      { path: "users", component: UsersListPage, meta: { page: "users" } }
     ]
   },
   { path: "/:catchAll(.*)*", redirect: "/dashboard" }

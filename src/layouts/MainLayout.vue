@@ -4,10 +4,21 @@
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="leftDrawerOpen = !leftDrawerOpen" />
         <q-toolbar-title class="row items-center q-gutter-sm">
-          <q-icon name="groups" />
-          <span>LifeGroup Admin</span>
+          <q-icon name="church" />
+          <span>LifeGroup System</span>
         </q-toolbar-title>
-        <q-chip color="white" text-color="primary" icon="admin_panel_settings">Administrator</q-chip>
+        <q-chip
+          v-if="primaryTag"
+          color="white"
+          text-color="primary"
+          :icon="tagIcon"
+          class="gt-xs"
+        >
+          {{ primaryTag }}
+        </q-chip>
+        <q-btn flat dense round icon="logout" @click="onLogout">
+          <q-tooltip>Sign out</q-tooltip>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -18,11 +29,26 @@
             <q-avatar color="primary" text-color="white" icon="person" />
           </q-item-section>
           <q-item-section>
-            <q-item-label class="text-weight-medium">Admin User</q-item-label>
-            <q-item-label caption>lifegroup system</q-item-label>
+            <q-item-label class="text-weight-medium">{{ auth.fullName }}</q-item-label>
+            <q-item-label caption>@{{ auth.username }}</q-item-label>
           </q-item-section>
         </q-item>
+
+        <div v-if="auth.tags.length" class="q-px-md q-mb-sm row q-gutter-xs">
+          <q-chip
+            v-for="tag in auth.tags"
+            :key="tag"
+            dense
+            size="sm"
+            color="blue-1"
+            text-color="primary"
+          >
+            {{ tag }}
+          </q-chip>
+        </div>
+
         <q-separator spaced />
+
         <q-item
           v-for="item in nav"
           :key="item.to"
@@ -46,17 +72,37 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
+import { useAuthStore } from "src/stores/auth";
+import { filterNavByTags, primaryTagLabel } from "src/utils/permissions";
 
+const $q = useQuasar();
+const router = useRouter();
+const auth = useAuthStore();
 const leftDrawerOpen = ref(true);
 
-const nav = [
-  { label: "Dashboard", to: "/dashboard", icon: "dashboard" },
-  { label: "Members", to: "/members", icon: "badge" },
-  { label: "Churches", to: "/churches", icon: "church" },
-  { label: "LifeGroups", to: "/lifegroups", icon: "hub" },
-  { label: "Events", to: "/events", icon: "event" },
-  { label: "Operations", to: "/operations", icon: "account_balance" },
-  { label: "Attendance", to: "/attendance", icon: "event_available" }
-];
+const nav = computed(() => filterNavByTags(auth.tags));
+const primaryTag = computed(() => primaryTagLabel(auth.tags));
+
+const tagIcon = computed(() => {
+  const tag = primaryTag.value;
+  if (tag === "Super User" || tag === "Main Church Admin") return "admin_panel_settings";
+  if (tag === "Executive Pastor" || tag === "Pastor") return "church";
+  if (tag === "Life Coach") return "groups";
+  return "badge";
+});
+
+function onLogout() {
+  $q.dialog({
+    title: "Sign out",
+    message: "Are you sure you want to sign out?",
+    cancel: true,
+    persistent: true
+  }).onOk(() => {
+    auth.logout();
+    router.push("/login");
+  });
+}
 </script>

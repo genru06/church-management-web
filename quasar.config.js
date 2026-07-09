@@ -3,7 +3,7 @@ import { configure } from "quasar/wrappers";
 export default configure(function () {
   return {
     supportTS: false,
-    boot: ["axios", "pinia"],
+    boot: ["pinia", "axios"],
     css: ["app.scss"],
     extras: ["material-icons"],
     build: {
