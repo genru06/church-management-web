@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "quasar dev",
-    "build": "quasar build"
+    "build": "quasar build && cp dist/spa/index.html dist/spa/404.html"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
