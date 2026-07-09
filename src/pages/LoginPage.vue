@@ -11,7 +11,7 @@
         <div class="login-card__brand">
           <q-avatar size="52px" color="white" text-color="primary" icon="church" class="login-card__avatar" />
           <div>
-            <div class="login-card__title">LifeGroup System</div>
+            <div class="login-card__title">BHCCCI Church Management System</div>
             <div class="login-card__subtitle">Serving churches, lifegroups &amp; communities</div>
           </div>
         </div>
