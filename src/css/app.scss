@@ -11,3 +11,35 @@ body {
 .q-card {
   border-radius: 12px;
 }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 599px) {
+  .q-page.q-pa-md {
+    padding: 12px !important;
+  }
+
+  .page-header {
+    align-items: flex-start;
+  }
+
+  .page-header__actions {
+    width: 100%;
+  }
+
+  .page-header__actions .q-btn {
+    flex: 1 1 auto;
+  }
+}

@@ -250,4 +250,15 @@ onMounted(loadSignupInfo);
 .event-signup-page__form {
   padding: 0 16px 16px;
 }
+
+@media (max-width: 599px) {
+  .event-signup-page {
+    padding: 12px 10px;
+  }
+
+  .event-signup-page__meta {
+    font-size: 0.75rem !important;
+    line-height: 1.4;
+  }
+}
 </style>

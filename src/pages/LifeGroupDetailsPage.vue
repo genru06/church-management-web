@@ -4,7 +4,7 @@
       <div class="entity-page__heading">
         <h1 class="entity-page__title">{{ group.name || "Lifegroup details" }}</h1>
       </div>
-      <div class="row q-gutter-xs">
+      <div class="entity-page__actions">
         <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" to="/lifegroups" />
         <q-btn
           dense

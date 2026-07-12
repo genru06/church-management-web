@@ -1,6 +1,6 @@
 <template>
   <q-dialog :model-value="modelValue" persistent @update:model-value="$emit('update:modelValue', $event)">
-    <q-card class="entity-dialog" style="min-width: 480px; max-width: 560px">
+    <q-card class="entity-dialog">
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">{{ mode === "create" ? "Add User" : "Edit User" }}</div>
         <q-space />

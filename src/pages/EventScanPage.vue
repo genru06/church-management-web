@@ -108,9 +108,10 @@ async function startScanner() {
   try {
     const { Html5Qrcode } = await import("html5-qrcode");
     scanner = new Html5Qrcode("qr-reader");
+    const qrSize = Math.min(250, Math.max(180, window.innerWidth - 48));
     await scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      { fps: 10, qrbox: { width: qrSize, height: qrSize } },
       (decodedText) => processPayload(decodedText),
       () => {}
     );

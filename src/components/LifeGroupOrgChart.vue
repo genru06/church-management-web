@@ -1,10 +1,10 @@
 <template>
   <div class="org-chart-wrapper">
-    <div class="row items-center justify-between q-mb-sm">
+    <div class="org-chart-wrapper__toolbar page-header q-mb-sm">
       <div class="text-subtitle2 text-grey-8">
         Viewing: <span class="text-weight-bold">{{ currentRootName }}</span>
       </div>
-      <div class="q-gutter-sm">
+      <div class="page-header__actions">
         <q-btn
           dense
           outline
@@ -349,5 +349,21 @@ watch(
   height: 100%;
   min-height: 420px;
   width: 100%;
+}
+
+.org-chart-wrapper canvas {
+  display: block;
+  width: 100% !important;
+  min-width: 280px;
+}
+
+@media (max-width: 599px) {
+  .org-chart-wrapper {
+    min-height: 360px;
+  }
+
+  .org-chart-wrapper__toolbar .text-subtitle2 {
+    font-size: 0.8rem;
+  }
 }
 </style>

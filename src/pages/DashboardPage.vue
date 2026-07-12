@@ -1,11 +1,11 @@
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-md">
+    <div class="page-header q-mb-md">
       <div>
         <div class="text-h5">Admin Dashboard</div>
         <div class="text-caption text-grey-7">Overview of members, churches, and lifegroups.</div>
       </div>
-      <div class="q-gutter-sm">
+      <div class="page-header__actions">
         <q-btn color="primary" unelevated icon="person_add" label="Add Member" @click="memberDialogOpen = true" />
         <q-btn color="secondary" unelevated icon="group_add" label="Add LifeGroup" @click="lifeGroupDialogOpen = true" />
       </div>

@@ -4,7 +4,7 @@
       <div class="entity-page__heading">
         <h1 class="entity-page__title">{{ church.name || "Church details" }}</h1>
       </div>
-      <div class="row q-gutter-xs">
+      <div class="entity-page__actions">
         <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" to="/churches" />
         <q-btn dense unelevated no-caps color="primary" icon="edit" label="Edit" @click="openEditDialog" />
       </div>

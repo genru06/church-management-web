@@ -5,7 +5,8 @@
         <q-btn dense flat round icon="menu" @click="leftDrawerOpen = !leftDrawerOpen" />
         <q-toolbar-title class="row items-center q-gutter-sm">
           <q-icon name="church" />
-          <span>LifeGroup System</span>
+          <span class="gt-xs">LifeGroup System</span>
+          <span class="lt-sm">LifeGroup</span>
         </q-toolbar-title>
         <q-chip
           v-if="primaryTag"
@@ -72,16 +73,26 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, ref, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import { useAuthStore } from "src/stores/auth";
 import { filterNavByTags, primaryTagLabel } from "src/utils/permissions";
 
 const $q = useQuasar();
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
-const leftDrawerOpen = ref(true);
+const leftDrawerOpen = ref($q.screen.gt.sm);
+
+watch(
+  () => route.path,
+  () => {
+    if ($q.screen.lt.md) {
+      leftDrawerOpen.value = false;
+    }
+  }
+);
 
 const nav = computed(() => filterNavByTags(auth.tags));
 const primaryTag = computed(() => primaryTagLabel(auth.tags));

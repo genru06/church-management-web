@@ -220,4 +220,22 @@ async function onLogin() {
   letter-spacing: 0.02em;
   border-radius: 8px;
 }
+
+@media (max-width: 599px) {
+  .login-page {
+    padding: 12px;
+  }
+
+  .login-card__header {
+    padding: 18px 16px;
+  }
+
+  .login-card__title {
+    font-size: 1.05rem;
+  }
+
+  .login-card__brand {
+    gap: 10px;
+  }
+}
 </style>

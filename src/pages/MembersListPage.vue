@@ -360,6 +360,7 @@ onMounted(loadMembers);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 10px;
 }
@@ -405,6 +406,30 @@ onMounted(loadMembers);
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+@media (max-width: 599px) {
+  .members-page {
+    padding: 8px 10px 12px;
+  }
+
+  .members-page__heading {
+    flex: 1 1 100%;
+  }
+
+  .members-page__actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .members-page__panel {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .members-table__search {
+    max-width: none;
+  }
 }
 
 .members-page__secondary-btn {

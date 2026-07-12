@@ -246,6 +246,26 @@ onMounted(async () => {
   }
 }
 
+@media (max-width: 599px) {
+  .member-profile {
+    padding: 8px 10px 16px;
+  }
+
+  .member-profile__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .member-profile__actions {
+    justify-content: flex-start;
+  }
+
+  .member-profile__meta {
+    white-space: normal;
+  }
+}
+
 @media (max-width: 480px) {
   .member-profile__row {
     grid-template-columns: 1fr;

@@ -1,11 +1,13 @@
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-md">
+    <div class="page-header q-mb-md">
       <div>
         <div class="text-h5">Weekly Attendance by LifeGroup</div>
         <div class="text-caption text-grey-7">Track present members each week.</div>
       </div>
-      <q-btn color="primary" icon="add_task" label="Record Attendance" @click="showModal = true" />
+      <div class="page-header__actions">
+        <q-btn color="primary" icon="add_task" label="Record Attendance" @click="showModal = true" />
+      </div>
     </div>
     <div class="row q-col-gutter-md q-mb-md">
       <div class="col-12 col-md-4">
@@ -25,7 +27,7 @@
     </q-card>
 
     <q-dialog v-model="showModal">
-      <q-card style="min-width: 360px">
+      <q-card class="entity-dialog">
         <q-card-section class="row items-center q-gutter-sm">
           <q-icon name="event" color="primary" />
           <div class="text-subtitle1">Record Attendance</div>

@@ -5,7 +5,7 @@
         <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push('/events')" />
         <h1 class="entity-page__title">{{ dashboard.event?.name || "Event dashboard" }}</h1>
       </div>
-      <div class="row q-gutter-sm">
+      <div class="entity-page__actions">
         <q-btn
           dense
           unelevated
@@ -633,5 +633,12 @@ onMounted(loadDashboard);
 .event-dashboard__registration-qr {
   border-top: 1px solid #eef1f6;
   padding-top: 12px;
+}
+
+@media (max-width: 599px) {
+  .event-dashboard__section-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 </style>
