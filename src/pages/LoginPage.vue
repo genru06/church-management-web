@@ -10,7 +10,7 @@
       <q-card-section class="login-card__header text-white">
         <div class="login-card__brand">
           <q-avatar size="52px" color="white" class="login-card__avatar">
-            <img src="/icons/safari-pinned-tab.svg" alt="Church logo" />
+            <img src="/icons/bhccci-logo.png" alt="BHCCCI logo" class="login-card__logo" />
           </q-avatar>
           <div>
             <div class="login-card__title">BHCCCI Church Management System</div>
@@ -202,6 +202,12 @@ async function onLogin() {
 
 .login-card__avatar {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.login-card__logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .login-card__title {
