@@ -11,7 +11,7 @@ export default configure(function () {
         browser: ["es2022", "firefox115", "chrome115", "safari14"],
         node: "node20"
       },
-      vueRouterMode: "hash"
+      vueRouterMode: "history"
     },
     devServer: {
       open: false
