@@ -3,6 +3,7 @@
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     @show="onShow"
+    @hide="onHide"
   >
     <q-card class="entity-dialog entity-dialog--wide participants-by-church-dialog">
       <header class="entity-dialog__header">
@@ -23,45 +24,59 @@
           <span>No participants yet.</span>
         </div>
 
-        <div v-else class="participants-by-church-dialog__grid">
-          <article
-            v-for="group in churchGroups"
-            :key="group.key"
-            class="participants-by-church-dialog__widget"
-          >
-            <div class="participants-by-church-dialog__widget-header">
-              <div class="participants-by-church-dialog__widget-info">
-                <q-icon name="church" size="20px" color="primary" />
-                <div>
-                  <h3 class="participants-by-church-dialog__widget-title">{{ group.churchName }}</h3>
-                  <p class="participants-by-church-dialog__widget-meta">
-                    {{ group.participants.length }} participant(s)
-                    <span v-if="group.attendedCount"> · {{ group.attendedCount }} attended</span>
-                  </p>
-                </div>
+        <template v-else>
+          <div class="row q-col-gutter-md participants-by-church-dialog__cards">
+            <div
+              v-for="(group, index) in churchGroups"
+              :key="group.key"
+              class="col-12 col-sm-6 col-md-4 col-lg-3"
+            >
+              <q-card
+                flat
+                bordered
+                class="participants-by-church-dialog__stat-card"
+                :class="{ 'participants-by-church-dialog__stat-card--active': selectedKey === group.key }"
+                @click="selectChurch(group)"
+              >
+                <q-card-section class="row items-center no-wrap">
+                  <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
+                  <div class="q-ml-md participants-by-church-dialog__stat-text">
+                    <div class="participants-by-church-dialog__stat-label">{{ group.churchName }}</div>
+                    <div class="participants-by-church-dialog__stat-value">{{ group.participants.length }}</div>
+                  </div>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+
+          <section v-if="selectedGroup" class="participants-by-church-dialog__detail">
+            <div class="participants-by-church-dialog__detail-header">
+              <div>
+                <h3 class="participants-by-church-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
+                <p class="participants-by-church-dialog__detail-meta">
+                  {{ selectedGroup.participants.length }} participant(s)
+                  <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
+                </p>
               </div>
               <q-btn
                 dense
-                outline
+                unelevated
                 no-caps
                 color="primary"
                 icon="download"
                 label="Export Excel"
-                @click="exportChurch(group)"
+                @click="exportChurch(selectedGroup)"
               />
             </div>
 
-            <q-separator />
-
             <q-table
-              :rows="group.participants"
+              :rows="selectedGroup.participants"
               :columns="participantColumns"
               row-key="id"
               flat
               dense
-              hide-pagination
-              :pagination="{ rowsPerPage: 0 }"
-              class="participants-by-church-dialog__table"
+              :pagination="{ rowsPerPage: 10 }"
+              class="participants-by-church-dialog__table entity-table"
             >
               <template #body-cell-lifegroupName="props">
                 <q-td :props="props">
@@ -91,8 +106,8 @@
                 </q-td>
               </template>
             </q-table>
-          </article>
-        </div>
+          </section>
+        </template>
       </q-card-section>
 
       <q-separator />
@@ -110,6 +125,8 @@ import { useQuasar } from "quasar";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 
+const CARD_COLORS = ["primary", "secondary", "accent", "positive", "orange", "purple"];
+
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   eventId: { type: [String, Number], default: null },
@@ -121,6 +138,7 @@ const emit = defineEmits(["update:modelValue"]);
 
 const $q = useQuasar();
 const qrByParticipant = ref({});
+const selectedKey = ref(null);
 
 const participantColumns = [
   { name: "lastName", label: "Last name", field: "lastName", align: "left", sortable: true },
@@ -166,8 +184,22 @@ const churchGroups = computed(() => {
     .sort((a, b) => a.churchName.localeCompare(b.churchName));
 });
 
+const selectedGroup = computed(() => {
+  if (!selectedKey.value) return null;
+  return churchGroups.value.find((group) => group.key === selectedKey.value) || null;
+});
+
+function cardColor(index) {
+  return CARD_COLORS[index % CARD_COLORS.length];
+}
+
 function close() {
   emit("update:modelValue", false);
+}
+
+function selectChurch(group) {
+  selectedKey.value = group.key;
+  loadQrCodes(group.participants);
 }
 
 function exportChurch(group) {
@@ -178,14 +210,14 @@ function exportChurch(group) {
   $q.notify({ type: "positive", message: `Exported ${group.churchName} participants.` });
 }
 
-async function loadQrCodes() {
-  if (!props.eventId || !props.participants.length) {
+async function loadQrCodes(participants) {
+  if (!props.eventId || !participants.length) {
     qrByParticipant.value = {};
     return;
   }
 
   const entries = await Promise.all(
-    props.participants.map(async (participant) => {
+    participants.map(async (participant) => {
       const payload = buildCheckInPayload(props.eventId, participant);
       const dataUrl = await generateQrDataUrl(payload);
       return [participant.id, dataUrl];
@@ -196,7 +228,14 @@ async function loadQrCodes() {
 }
 
 function onShow() {
-  loadQrCodes();
+  if (churchGroups.value.length) {
+    selectChurch(churchGroups.value[0]);
+  }
+}
+
+function onHide() {
+  selectedKey.value = null;
+  qrByParticipant.value = {};
 }
 </script>
 
@@ -207,68 +246,81 @@ function onShow() {
 }
 
 .participants-by-church-dialog__body {
-  padding: 12px 16px;
+  padding: 16px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
 }
 
-.participants-by-church-dialog__grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.participants-by-church-dialog__cards {
+  margin-bottom: 4px;
 }
 
-.participants-by-church-dialog__widget {
+.participants-by-church-dialog__stat-card {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(26, 26, 46, 0.08);
+  }
+}
+
+.participants-by-church-dialog__stat-card--active {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 1px #1976d2;
+}
+
+.participants-by-church-dialog__stat-text {
+  min-width: 0;
+}
+
+.participants-by-church-dialog__stat-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #2d3340;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participants-by-church-dialog__stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1.2;
+}
+
+.participants-by-church-dialog__detail {
+  margin-top: 16px;
   border: 1px solid #e4e8ef;
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
 }
 
-.participants-by-church-dialog__widget-header {
+.participants-by-church-dialog__detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  background: #f8fafc;
+  border-bottom: 1px solid #eef1f6;
+  background: #fafbfc;
 }
 
-.participants-by-church-dialog__widget-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 0;
-}
-
-.participants-by-church-dialog__widget-title {
+.participants-by-church-dialog__detail-title {
   margin: 0;
   font-size: 0.88rem;
   font-weight: 600;
   color: #1a1a2e;
-  line-height: 1.3;
 }
 
-.participants-by-church-dialog__widget-meta {
+.participants-by-church-dialog__detail-meta {
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: #6b7280;
-}
-
-.participants-by-church-dialog__table {
-  :deep(.q-table th) {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #8b93a1;
-  }
-
-  :deep(.q-table td) {
-    font-size: 0.8rem;
-    color: #2d3340;
-  }
 }
 
 .participants-by-church-dialog__qr img {
@@ -288,7 +340,7 @@ function onShow() {
 }
 
 @media (max-width: 599px) {
-  .participants-by-church-dialog__widget-header {
+  .participants-by-church-dialog__detail-header {
     flex-wrap: wrap;
   }
 }
