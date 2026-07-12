@@ -9,7 +9,9 @@
     <q-card class="login-card shadow-24">
       <q-card-section class="login-card__header text-white">
         <div class="login-card__brand">
-          <q-avatar size="52px" color="white" text-color="primary" icon="church" class="login-card__avatar" />
+          <q-avatar size="52px" color="white" class="login-card__avatar">
+            <img src="/icons/safari-pinned-tab.svg" alt="Church logo" />
+          </q-avatar>
           <div>
             <div class="login-card__title">BHCCCI Church Management System</div>
             <div class="login-card__subtitle">Serving churches, lifegroups &amp; communities</div>
