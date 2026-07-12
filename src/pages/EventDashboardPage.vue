@@ -209,7 +209,19 @@
       <section class="entity-page__panel q-mb-md">
         <div class="event-dashboard__section-header">
           <h2>Participants</h2>
-          <q-btn dense unelevated no-caps color="primary" icon="person_add" label="Add participant" @click="openParticipantDialog" />
+          <div class="event-dashboard__section-actions">
+            <q-btn
+              dense
+              outline
+              no-caps
+              color="primary"
+              icon="church"
+              label="By church"
+              :disable="!dashboard.participants.length"
+              @click="participantsByChurchDialogOpen = true"
+            />
+            <q-btn dense unelevated no-caps color="primary" icon="person_add" label="Add participant" @click="openParticipantDialog" />
+          </div>
         </div>
         <q-table
           :rows="dashboard.participants"
@@ -314,6 +326,13 @@
       :event="dashboard.event"
     />
 
+    <EventParticipantsByChurchDialog
+      v-model="participantsByChurchDialogOpen"
+      :event-id="eventId"
+      :event="dashboard.event"
+      :participants="dashboard.participants"
+    />
+
     <q-dialog v-model="pledgeDialogOpen" persistent>
       <q-card class="entity-dialog">
         <header class="entity-dialog__header">
@@ -360,6 +379,7 @@ import EventFormDialog from "src/components/EventFormDialog.vue";
 import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
 import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
+import EventParticipantsByChurchDialog from "src/components/EventParticipantsByChurchDialog.vue";
 import {
   getEventSignupUrl,
   isRegistrationOpen
@@ -379,6 +399,7 @@ const loading = ref(false);
 const dashboard = ref({ event: null, participants: [], pledges: [], stats: {} });
 const editDialogOpen = ref(false);
 const registrationQrDialogOpen = ref(false);
+const participantsByChurchDialogOpen = ref(false);
 const participantDialogOpen = ref(false);
 const participantMode = ref("create");
 const editingParticipant = ref(null);
@@ -606,6 +627,12 @@ onMounted(loadDashboard);
     font-weight: 600;
     color: #1a1a2e;
   }
+}
+
+.event-dashboard__section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .event-dashboard__details {
