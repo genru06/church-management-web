@@ -5,8 +5,8 @@
         <q-btn dense flat round icon="menu" @click="leftDrawerOpen = !leftDrawerOpen" />
         <q-toolbar-title class="row items-center q-gutter-sm">
           <q-icon name="church" />
-          <span class="gt-xs">LifeGroup System</span>
-          <span class="lt-sm">LifeGroup</span>
+          <span class="gt-xs">Blessed Hope Church Management System</span>
+          <span class="lt-sm">BHCCCI System</span>
         </q-toolbar-title>
         <q-chip
           v-if="primaryTag"
