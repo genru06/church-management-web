@@ -39,11 +39,11 @@
               </div>
               <div class="col-12 col-sm-6">
                 <q-select
-                  v-model="form.coachMemberId"
-                  :options="memberOptions"
+                  v-model="form.churchId"
+                  :options="churchOptions"
                   emit-value
                   map-options
-                  label="Coach *"
+                  label="Church *"
                   dense
                   outlined
                   hide-bottom-space
@@ -52,12 +52,12 @@
               </div>
               <div class="col-12 col-sm-6">
                 <q-select
-                  v-model="form.churchId"
-                  :options="churchOptions"
+                  v-model="form.coachMemberId"
+                  :options="memberOptions"
                   emit-value
                   map-options
                   clearable
-                  label="Church"
+                  label="Coach"
                   dense
                   outlined
                   hide-bottom-space
@@ -88,6 +88,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
+import { api } from "src/boot/axios";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
 
 const props = defineProps({
