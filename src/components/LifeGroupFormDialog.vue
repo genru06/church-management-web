@@ -43,11 +43,14 @@
                   :options="churchOptions"
                   emit-value
                   map-options
+                  use-input
+                  input-debounce="0"
                   label="Church *"
                   dense
                   outlined
                   hide-bottom-space
                   :rules="[requiredRule]"
+                  @filter="onChurchFilter"
                 />
               </div>
               <div class="col-12 col-sm-6">
@@ -56,11 +59,14 @@
                   :options="memberOptions"
                   emit-value
                   map-options
+                  use-input
+                  input-debounce="0"
                   clearable
                   label="Coach"
                   dense
                   outlined
                   hide-bottom-space
+                  @filter="onCoachFilter"
                 />
               </div>
             </div>
@@ -103,10 +109,33 @@ const $q = useQuasar();
 const formRef = ref(null);
 const loading = ref(false);
 const saving = ref(false);
+const allMemberOptions = ref([]);
+const allChurchOptions = ref([]);
 const memberOptions = ref([]);
 const churchOptions = ref([]);
 
 const requiredRule = (val) => !!val || "Required";
+
+function filterSelectOptions(allOptions, displayedOptions, val, update) {
+  update(() => {
+    if (!val) {
+      displayedOptions.value = allOptions.value;
+      return;
+    }
+    const needle = val.toLowerCase();
+    displayedOptions.value = allOptions.value.filter((opt) =>
+      opt.label.toLowerCase().includes(needle)
+    );
+  });
+}
+
+function onChurchFilter(val, update) {
+  filterSelectOptions(allChurchOptions, churchOptions, val, update);
+}
+
+function onCoachFilter(val, update) {
+  filterSelectOptions(allMemberOptions, memberOptions, val, update);
+}
 
 const emptyForm = () => ({
   name: "",
@@ -128,14 +157,16 @@ function resetForm() {
 
 async function loadOptions() {
   const [membersRes, churchesRes] = await Promise.all([api.get("/members"), api.get("/churches")]);
-  memberOptions.value = membersRes.data.map((m) => ({
+  allMemberOptions.value = membersRes.data.map((m) => ({
     label: `${m.lastName}, ${m.firstName}`,
     value: m.id
   }));
-  churchOptions.value = churchesRes.data.map((c) => ({
+  allChurchOptions.value = churchesRes.data.map((c) => ({
     label: getChurchDisplayName(c),
     value: c.id
   }));
+  memberOptions.value = allMemberOptions.value;
+  churchOptions.value = allChurchOptions.value;
 }
 
 async function loadLifeGroup() {

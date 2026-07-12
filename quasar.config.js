@@ -20,6 +20,15 @@ export default configure(function () {
       config: {},
       plugins: ["Dialog", "Notify"]
     },
+    pwa: {
+      workboxMode: "InjectManifest",
+      injectPwaMetaTags: true,
+      manifestFilename: "manifest.json",
+      extendManifestJson(manifest) {
+        manifest.name = "BHCCCI Church Management System";
+        manifest.short_name = "BHCCCI";
+      }
+    },
     animations: []
   };
 });

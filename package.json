@@ -1,11 +1,13 @@
 {
-  "name": "lifegroup-frontend",
+  "name": "bhccci-church-management",
+  "productName": "BHCCCI Church Management System",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "quasar dev",
-    "build": "quasar build && cp dist/spa/index.html dist/spa/404.html"
+    "build": "quasar build && cp dist/spa/index.html dist/spa/404.html",
+    "build:pwa": "quasar build -m pwa"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
