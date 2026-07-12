@@ -1,17 +1,21 @@
 <template>
   <q-dialog
     :model-value="modelValue"
+    maximized
     @update:model-value="$emit('update:modelValue', $event)"
     @show="onShow"
     @hide="onHide"
   >
-    <q-card class="entity-dialog entity-dialog--wide participants-by-church-dialog">
-      <header class="entity-dialog__header">
-        <div>
-          <h2 class="entity-dialog__title">Participants by church</h2>
-          <p class="entity-dialog__subtitle">
-            {{ event?.name || "Event" }} · {{ participants.length }} participant(s) across {{ churchGroups.length }} church(es)
-          </p>
+    <q-card class="participants-by-church-dialog">
+      <header class="participants-by-church-dialog__header">
+        <div class="participants-by-church-dialog__heading">
+          <q-btn flat dense round icon="arrow_back" color="grey-7" @click="close" />
+          <div>
+            <h2 class="participants-by-church-dialog__title">Participants by church</h2>
+            <p class="participants-by-church-dialog__subtitle">
+              {{ event?.name || "Event" }} · {{ participants.length }} participant(s) across {{ churchGroups.length }} church(es)
+            </p>
+          </div>
         </div>
         <q-btn flat round dense icon="close" color="grey-7" @click="close" />
       </header>
@@ -20,8 +24,8 @@
 
       <q-card-section class="participants-by-church-dialog__body">
         <div v-if="!churchGroups.length" class="participants-by-church-dialog__empty">
-          <q-icon name="groups" size="24px" color="grey-5" />
-          <span>No participants yet.</span>
+          <q-icon name="groups" size="32px" color="grey-5" />
+          <p>No participants yet.</p>
         </div>
 
         <template v-else>
@@ -49,7 +53,7 @@
             </div>
           </div>
 
-          <section v-if="selectedGroup" class="participants-by-church-dialog__detail">
+          <section v-if="selectedGroup" class="participants-by-church-dialog__detail entity-page__panel">
             <div class="participants-by-church-dialog__detail-header">
               <div>
                 <h3 class="participants-by-church-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
@@ -75,7 +79,7 @@
               row-key="id"
               flat
               dense
-              :pagination="{ rowsPerPage: 10 }"
+              :pagination="{ rowsPerPage: 25 }"
               class="participants-by-church-dialog__table entity-table"
             >
               <template #body-cell-lifegroupName="props">
@@ -109,12 +113,6 @@
           </section>
         </template>
       </q-card-section>
-
-      <q-separator />
-
-      <footer class="entity-dialog__footer">
-        <q-btn flat no-caps label="Close" color="grey-8" @click="close" />
-      </footer>
     </q-card>
   </q-dialog>
 </template>
@@ -241,24 +239,59 @@ function onHide() {
 
 <style scoped lang="scss">
 .participants-by-church-dialog {
-  width: min(960px, 94vw);
-  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f7fa;
+}
+
+.participants-by-church-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: #fff;
+}
+
+.participants-by-church-dialog__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.participants-by-church-dialog__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.participants-by-church-dialog__subtitle {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
 .participants-by-church-dialog__body {
+  flex: 1;
   padding: 16px;
   overflow-y: auto;
-  flex: 1;
   min-height: 0;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .participants-by-church-dialog__cards {
-  margin-bottom: 4px;
+  margin-bottom: 16px;
 }
 
 .participants-by-church-dialog__stat-card {
   cursor: pointer;
   border-radius: 8px;
+  background: #fff;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
@@ -293,11 +326,7 @@ function onHide() {
 }
 
 .participants-by-church-dialog__detail {
-  margin-top: 16px;
-  border: 1px solid #e4e8ef;
-  border-radius: 8px;
   overflow: hidden;
-  background: #fff;
 }
 
 .participants-by-church-dialog__detail-header {
@@ -330,13 +359,19 @@ function onHide() {
 }
 
 .participants-by-church-dialog__empty {
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 32px 12px;
+  gap: 10px;
+  min-height: 240px;
   color: #8b93a1;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
+
+  p {
+    margin: 0;
+  }
 }
 
 @media (max-width: 599px) {
