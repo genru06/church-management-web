@@ -278,11 +278,19 @@ const templateScopeOptions = [
 ];
 
 const pagination = ref({
-  sortBy: "lastName",
+  sortBy: "name",
   descending: false,
   page: 1,
   rowsPerPage: 25
 });
+
+function compareMemberNames(rowA, rowB) {
+  const lastNameCompare = (rowA.lastName || "").localeCompare(rowB.lastName || "", undefined, {
+    sensitivity: "base"
+  });
+  if (lastNameCompare !== 0) return lastNameCompare;
+  return (rowA.firstName || "").localeCompare(rowB.firstName || "", undefined, { sensitivity: "base" });
+}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -479,7 +487,7 @@ const columns = [
     field: (row) => `${row.lastName}, ${row.firstName}`,
     align: "left",
     sortable: true,
-    sort: (a, b) => a.localeCompare(b)
+    sort: (_, __, rowA, rowB) => compareMemberNames(rowA, rowB)
   },
   { name: "email", label: "Email", field: "email", align: "left", sortable: true },
   { name: "phone", label: "Phone", field: "phone", align: "left" },
