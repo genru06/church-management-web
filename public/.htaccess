@@ -5,6 +5,10 @@ ErrorDocument 404 /index.html
   RewriteEngine On
   RewriteBase /
 
+  # iOS/Safari request these at the site root before reading HTML
+  RewriteRule ^apple-touch-icon(-precomposed)?\.png$ icons/apple-icon-180x180.png [L]
+  RewriteRule ^favicon\.ico$ icons/favicon.ico [L]
+
   # If the request is for a real file or folder, serve it
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
