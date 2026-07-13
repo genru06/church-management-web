@@ -212,6 +212,32 @@
           <div class="event-dashboard__section-actions">
             <q-btn
               dense
+              flat
+              no-caps
+              color="grey-8"
+              icon="download"
+              label="Download template"
+              @click="openTemplateDialog"
+            />
+            <q-btn
+              dense
+              flat
+              no-caps
+              color="grey-8"
+              icon="upload_file"
+              label="Upload Excel"
+              :loading="uploadingParticipants"
+              @click="openUploadPicker"
+            />
+            <input
+              ref="uploadInputRef"
+              type="file"
+              accept=".xlsx,.xls"
+              class="event-dashboard__upload-input"
+              @change="onUploadSelected"
+            />
+            <q-btn
+              dense
               outline
               no-caps
               color="primary"
@@ -333,6 +359,70 @@
       :participants="dashboard.participants"
     />
 
+    <q-dialog v-model="templateDialogOpen" persistent>
+      <q-card class="event-participant-template-dialog">
+        <q-card-section class="event-participant-template-dialog__header">
+          <div>
+            <h2 class="event-participant-template-dialog__title">Download import template</h2>
+            <p class="event-participant-template-dialog__subtitle">
+              Choose a general template or one tied to a specific church for this event.
+            </p>
+          </div>
+          <q-btn flat round dense icon="close" color="grey-7" @click="closeTemplateDialog" />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="event-participant-template-dialog__body">
+          <q-option-group
+            v-model="templateScope"
+            :options="templateScopeOptions"
+            type="radio"
+            color="primary"
+            dense
+          />
+
+          <AppSelect
+            v-if="templateScope === 'church'"
+            v-model="templateChurchId"
+            :options="allChurchOptions"
+            label="Church *"
+            dense
+            outlined
+            emit-value
+            map-options
+            clearable
+            class="event-participant-template-dialog__church-select"
+            :loading="churchesLoading"
+          />
+
+          <p v-if="templateScope === 'general'" class="event-participant-template-dialog__hint">
+            This template includes the event identifier. Existing members are matched by name and linked
+            to the event. Names not found are added as event-only participants, not as members.
+          </p>
+          <p v-else class="event-participant-template-dialog__hint">
+            The template includes hidden event and church identifiers. Existing members are matched by
+            name and linked to the event. Names not found are created as members under the selected
+            church, then added as participants.
+          </p>
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions align="right" class="event-participant-template-dialog__actions">
+          <q-btn flat no-caps color="grey-8" label="Cancel" @click="closeTemplateDialog" />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            label="Download"
+            :disable="templateScope === 'church' && !templateChurchId"
+            @click="downloadTemplate"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="pledgeDialogOpen" persistent>
       <q-card class="entity-dialog">
         <header class="entity-dialog__header">
@@ -380,6 +470,12 @@ import EventParticipantFormDialog from "src/components/EventParticipantFormDialo
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
 import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
 import EventParticipantsByChurchDialog from "src/components/EventParticipantsByChurchDialog.vue";
+import AppSelect from "src/components/AppSelect.vue";
+import {
+  downloadEventParticipantBulkTemplate,
+  parseEventParticipantBulkUpload
+} from "src/utils/eventParticipantBulkExcel";
+import { getChurchDisplayName } from "src/utils/churchDisplay";
 import {
   getEventSignupUrl,
   isRegistrationOpen
@@ -403,6 +499,13 @@ const participantsByChurchDialogOpen = ref(false);
 const participantDialogOpen = ref(false);
 const participantMode = ref("create");
 const editingParticipant = ref(null);
+const uploadingParticipants = ref(false);
+const uploadInputRef = ref(null);
+const templateDialogOpen = ref(false);
+const templateScope = ref("general");
+const templateChurchId = ref(null);
+const allChurchOptions = ref([]);
+const churchesLoading = ref(false);
 const pledgeDialogOpen = ref(false);
 const pledgeMode = ref("create");
 const pledgeSaving = ref(false);
@@ -410,6 +513,11 @@ const editingPledgeId = ref(null);
 const pledgeFormRef = ref(null);
 
 const requiredRule = (val) => !!val || "Required";
+
+const templateScopeOptions = [
+  { label: "General", value: "general" },
+  { label: "Per church", value: "church" }
+];
 
 const pledgeForm = ref({
   pledgerName: "",
@@ -489,6 +597,118 @@ function openParticipantDialog() {
   participantMode.value = "create";
   editingParticipant.value = null;
   participantDialogOpen.value = true;
+}
+
+async function loadChurches() {
+  churchesLoading.value = true;
+  try {
+    const { data } = await api.get("/churches");
+    allChurchOptions.value = data.map((church) => ({
+      label: getChurchDisplayName(church),
+      value: Number(church.id)
+    }));
+  } finally {
+    churchesLoading.value = false;
+  }
+}
+
+function openTemplateDialog() {
+  templateScope.value = "general";
+  templateChurchId.value = null;
+  templateDialogOpen.value = true;
+  if (!allChurchOptions.value.length) {
+    loadChurches();
+  }
+}
+
+function closeTemplateDialog() {
+  templateDialogOpen.value = false;
+}
+
+function downloadTemplate() {
+  if (templateScope.value === "church" && !templateChurchId.value) return;
+
+  const selectedChurch = allChurchOptions.value.find((church) => church.value === templateChurchId.value);
+
+  downloadEventParticipantBulkTemplate(
+    templateScope.value === "church"
+      ? {
+          eventId: Number(eventId),
+          eventName: dashboard.value.event?.name || null,
+          churchId: templateChurchId.value,
+          churchName: selectedChurch?.label || null
+        }
+      : {
+          eventId: Number(eventId),
+          eventName: dashboard.value.event?.name || null
+        }
+  );
+
+  const message =
+    templateScope.value === "church"
+      ? `Church participant template downloaded${selectedChurch ? ` for ${selectedChurch.label}` : ""}.`
+      : "General participant import template downloaded.";
+
+  $q.notify({ type: "info", message });
+  closeTemplateDialog();
+}
+
+function openUploadPicker() {
+  uploadInputRef.value?.click();
+}
+
+function resetUploadInput() {
+  if (uploadInputRef.value) uploadInputRef.value.value = "";
+}
+
+async function onUploadSelected(event) {
+  const file = event.target.files?.[0];
+  resetUploadInput();
+  if (!file) return;
+
+  uploadingParticipants.value = true;
+  try {
+    const payload = await parseEventParticipantBulkUpload(file);
+
+    if (Number(payload.eventId) !== Number(eventId)) {
+      throw new Error(
+        "This template belongs to a different event. Download the template from this event dashboard."
+      );
+    }
+
+    const { data } = await api.post(`/events/${eventId}/participants/import`, payload);
+
+    await loadDashboard();
+
+    if (data.errors?.length) {
+      const preview = data.errors
+        .slice(0, 3)
+        .map((item) => `Row ${item.row}: ${item.message}`)
+        .join(" · ");
+      const suffix = data.errors.length > 3 ? ` (+${data.errors.length - 3} more)` : "";
+
+      $q.notify({
+        type: data.created ? "warning" : "negative",
+        message: `${data.created} participant(s) imported. ${data.errors.length} row(s) failed.`,
+        caption: `${preview}${suffix}`,
+        timeout: 6000
+      });
+    } else {
+      const churchNote = payload.churchId ? " and new members were assigned to the template church" : "";
+      $q.notify({
+        type: "positive",
+        message: `${data.created} participant(s) imported successfully${churchNote}.`
+      });
+    }
+  } catch (err) {
+    const message = err?.response?.data?.message || err?.message || "Failed to import participants.";
+    $q.notify({
+      type: "negative",
+      message: Array.isArray(message) ? message[0] : message
+    });
+  } finally {
+    uploadingParticipants.value = false;
+  }
 }
 
 function editParticipant(row) {
@@ -633,6 +853,58 @@ onMounted(loadDashboard);
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.event-dashboard__upload-input {
+  display: none;
+}
+
+.event-participant-template-dialog {
+  width: min(420px, 92vw);
+}
+
+.event-participant-template-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+}
+
+.event-participant-template-dialog__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.event-participant-template-dialog__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.event-participant-template-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.event-participant-template-dialog__church-select {
+  margin-top: 4px;
+}
+
+.event-participant-template-dialog__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #8b93a1;
+}
+
+.event-participant-template-dialog__actions {
+  padding: 10px 12px;
 }
 
 .event-dashboard__details {

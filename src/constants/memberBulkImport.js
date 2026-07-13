@@ -24,6 +24,6 @@ export const MEMBER_BULK_COLUMNS_V2 = [
 export const MEMBER_BULK_COLUMNS = [
   { header: "First Name*", key: "firstName" },
   { header: "Last Name*", key: "lastName" },
-  { header: "Tag", key: "tag" },
+  { header: "Tags (comma-separated)", key: "tag" },
   ...MEMBER_BULK_COLUMNS_V2.slice(2)
 ];

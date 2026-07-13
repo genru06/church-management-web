@@ -3,7 +3,6 @@
     :model-value="modelValue"
     persistent
     @update:model-value="$emit('update:modelValue', $event)"
-    @show="onShow"
   >
     <q-card class="member-dialog">
       <header class="member-dialog__header">
@@ -156,6 +155,7 @@
             <div class="row q-col-gutter-sm">
               <div class="col-12">
                 <AppSelect
+                  :key="tagsSelectKey"
                   v-model="form.tags"
                   :options="tagOptions"
                   label="Tags"
@@ -165,6 +165,9 @@
                   outlined
                   hide-bottom-space
                 />
+                <div class="text-caption text-grey-6 q-mt-xs">
+                  A member can have multiple tags. Select all that apply.
+                </div>
               </div>
             </div>
           </fieldset>
@@ -189,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { DEFAULT_CITY_ID } from "src/mocks/data";
@@ -212,6 +215,7 @@ const saving = ref(false);
 const cityOptions = ref([]);
 const allChurchOptions = ref([]);
 const tagOptions = ref([]);
+const tagsSelectKey = ref(0);
 
 const genderOptions = ["Male", "Female"].map((v) => ({ label: v, value: v }));
 const maritalStatusOptions = ["Single", "Married", "Widowed", "Divorced", "Separated"].map((v) => ({
@@ -262,7 +266,15 @@ async function loadChurches() {
 
 async function loadTags() {
   const { data } = await api.get("/tags");
-  tagOptions.value = data.map((tag) => tag.name);
+  tagOptions.value = data.map((tag) => tag.name).sort((a, b) => a.localeCompare(b));
+}
+
+function mergeTagOptions(memberTags = []) {
+  const merged = new Set(tagOptions.value);
+  for (const tag of memberTags) {
+    if (tag) merged.add(tag);
+  }
+  tagOptions.value = [...merged].sort((a, b) => a.localeCompare(b));
 }
 
 function normalizeChurchId(value) {
@@ -308,6 +320,7 @@ async function loadMember() {
   loading.value = true;
   try {
     const { data } = await api.get(`/members/${props.memberId}`);
+    mergeTagOptions(data.tags);
     form.value = {
       ...emptyForm(),
       ...data,
@@ -315,8 +328,10 @@ async function loadMember() {
       churchId: normalizeChurchId(data.churchId),
       gender: data.gender || null,
       maritalStatus: data.maritalStatus || null,
-      tags: data.tags || []
+      tags: [...(data.tags || [])]
     };
+    await nextTick();
+    tagsSelectKey.value += 1;
     if (data.city) {
       const exists = cityOptions.value.some((opt) => opt.value === data.cityId);
       if (!exists && data.cityId) {
@@ -347,7 +362,11 @@ async function submit() {
 
   saving.value = true;
   try {
-    const payload = { ...form.value, churchId: normalizeChurchId(form.value.churchId) };
+    const payload = {
+      ...form.value,
+      churchId: normalizeChurchId(form.value.churchId),
+      tags: Array.isArray(form.value.tags) ? [...form.value.tags] : []
+    };
     delete payload.church;
     const { data } =
       props.mode === "create"
@@ -370,9 +389,14 @@ async function submit() {
 }
 
 watch(
-  () => props.modelValue,
-  (open) => {
-    if (!open) resetForm();
+  () => [props.modelValue, props.memberId, props.mode],
+  async ([open]) => {
+    if (!open) {
+      resetForm();
+      tagsSelectKey.value = 0;
+      return;
+    }
+    await onShow();
   }
 );
 </script>
