@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "quasar dev",
     "build": "quasar build && cp dist/spa/index.html dist/spa/404.html",
-    "build:pwa": "quasar build -m pwa"
+    "build:pwa": "quasar build -m pwa",
+    "build:all": "npm run build && npm run build:pwa"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
