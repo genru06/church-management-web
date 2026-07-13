@@ -6,30 +6,85 @@
     @show="onShow"
     @hide="onHide"
   >
-    <q-card class="participants-by-church-dialog">
-      <header class="participants-by-church-dialog__header">
-        <div class="participants-by-church-dialog__heading">
+    <q-card class="participants-view-dialog">
+      <header class="participants-view-dialog__header">
+        <div class="participants-view-dialog__heading">
           <q-btn flat dense round icon="arrow_back" color="grey-7" @click="close" />
           <div>
-            <h2 class="participants-by-church-dialog__title">Participants by church</h2>
-            <p class="participants-by-church-dialog__subtitle">
-              {{ event?.name || "Event" }} · {{ participants.length }} participant(s) across {{ churchGroups.length }} church(es)
+            <h2 class="participants-view-dialog__title">Participants</h2>
+            <p class="participants-view-dialog__subtitle">
+              {{ event?.name || "Event" }} · {{ participants.length }} participant(s)
             </p>
           </div>
         </div>
-        <q-btn flat round dense icon="close" color="grey-7" @click="close" />
+
+        <div class="participants-view-dialog__toolbar">
+          <q-btn-toggle
+            v-model="viewMode"
+            no-caps
+            unelevated
+            toggle-color="primary"
+            color="white"
+            text-color="grey-8"
+            :options="viewModeOptions"
+            class="participants-view-dialog__toggle"
+          />
+          <q-btn flat round dense icon="close" color="grey-7" @click="close" />
+        </div>
       </header>
 
       <q-separator />
 
-      <q-card-section class="participants-by-church-dialog__body">
-        <div v-if="!churchGroups.length" class="participants-by-church-dialog__empty">
+      <q-card-section class="participants-view-dialog__body">
+        <div v-if="!participants.length" class="participants-view-dialog__empty">
           <q-icon name="groups" size="32px" color="grey-5" />
           <p>No participants yet.</p>
         </div>
 
+        <template v-else-if="viewMode === 'all'">
+          <q-table
+            :rows="sortedParticipants"
+            :columns="allColumns"
+            row-key="id"
+            flat
+            dense
+            :pagination="{ rowsPerPage: 25 }"
+            class="participants-view-dialog__table entity-table entity-page__panel"
+          >
+            <template #body-cell-churchName="props">
+              <q-td :props="props">
+                <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
+              </q-td>
+            </template>
+
+            <template #body-cell-lifegroupName="props">
+              <q-td :props="props">
+                <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+              </q-td>
+            </template>
+
+            <template #body-cell-registrationPaid="props">
+              <q-td :props="props">
+                <q-badge
+                  :color="props.row.registrationPaid ? 'positive' : 'warning'"
+                  :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
+                />
+              </q-td>
+            </template>
+
+            <template #body-cell-attendedAt="props">
+              <q-td :props="props">
+                <q-badge
+                  :color="props.row.attendedAt ? 'positive' : 'grey'"
+                  :label="props.row.attendedAt ? 'Present' : 'Absent'"
+                />
+              </q-td>
+            </template>
+          </q-table>
+        </template>
+
         <template v-else>
-          <div class="row q-col-gutter-md participants-by-church-dialog__cards">
+          <div class="row q-col-gutter-md participants-view-dialog__cards">
             <div
               v-for="(group, index) in churchGroups"
               :key="group.key"
@@ -38,31 +93,31 @@
               <q-card
                 flat
                 bordered
-                class="participants-by-church-dialog__stat-card"
-                :class="{ 'participants-by-church-dialog__stat-card--active': selectedKey === group.key }"
+                class="participants-view-dialog__stat-card"
+                :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
                 @click="selectChurch(group)"
               >
                 <q-card-section class="row items-center no-wrap">
                   <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
-                  <div class="q-ml-md participants-by-church-dialog__stat-text">
-                    <div class="participants-by-church-dialog__stat-label">{{ group.churchName }}</div>
-                    <div class="participants-by-church-dialog__stat-value">{{ group.participants.length }}</div>
+                  <div class="q-ml-md participants-view-dialog__stat-text">
+                    <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
+                    <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
                   </div>
                 </q-card-section>
               </q-card>
             </div>
           </div>
 
-          <section v-if="selectedGroup" class="participants-by-church-dialog__detail entity-page__panel">
-            <div class="participants-by-church-dialog__detail-header">
+          <section v-if="selectedGroup" class="participants-view-dialog__detail entity-page__panel">
+            <div class="participants-view-dialog__detail-header">
               <div>
-                <h3 class="participants-by-church-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
-                <p class="participants-by-church-dialog__detail-meta">
+                <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
+                <p class="participants-view-dialog__detail-meta">
                   {{ selectedGroup.participants.length }} participant(s)
                   <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
                 </p>
               </div>
-              <div class="participants-by-church-dialog__detail-actions">
+              <div class="participants-view-dialog__detail-actions">
                 <q-btn
                   dense
                   outline
@@ -86,12 +141,12 @@
 
             <q-table
               :rows="selectedGroup.participants"
-              :columns="participantColumns"
+              :columns="churchColumns"
               row-key="id"
               flat
               dense
               :pagination="{ rowsPerPage: 25 }"
-              class="participants-by-church-dialog__table entity-table"
+              class="participants-view-dialog__table entity-table"
             >
               <template #body-cell-lifegroupName="props">
                 <q-td :props="props">
@@ -110,7 +165,7 @@
 
               <template #body-cell-qrCode="props">
                 <q-td :props="props">
-                  <div class="participants-by-church-dialog__qr">
+                  <div class="participants-view-dialog__qr">
                     <img
                       v-if="qrByParticipant[props.row.id]"
                       :src="qrByParticipant[props.row.id]"
@@ -129,7 +184,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
@@ -142,19 +197,70 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   eventId: { type: [String, Number], default: null },
   event: { type: Object, default: null },
-  participants: { type: Array, default: () => [] }
+  participants: { type: Array, default: () => [] },
+  hasRegistrationFee: { type: Boolean, default: false },
+  initialView: { type: String, default: "all" }
 });
 
 const emit = defineEmits(["update:modelValue"]);
 
 const $q = useQuasar();
 const router = useRouter();
+const viewMode = ref("all");
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
 
-const participantColumns = [
-  { name: "lastName", label: "Last name", field: "lastName", align: "left", sortable: true },
-  { name: "firstName", label: "First name", field: "firstName", align: "left", sortable: true },
+const viewModeOptions = [
+  { label: "All participants", value: "all" },
+  { label: "By church", value: "church" }
+];
+
+const sortedParticipants = computed(() =>
+  [...props.participants]
+    .map((participant) => ({
+      ...participant,
+      displayLastName: participant.lastName || participant.fullName || "—",
+      displayFirstName:
+        participant.firstName ||
+        (participant.lastName || !participant.fullName ? "—" : "")
+    }))
+    .sort((a, b) => {
+      const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
+      if (last !== 0) return last;
+      return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
+    })
+);
+
+const allColumns = computed(() => {
+  const columns = [
+    { name: "displayLastName", label: "Last name", field: "displayLastName", align: "left", sortable: true },
+    { name: "displayFirstName", label: "First name", field: "displayFirstName", align: "left", sortable: true },
+    { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
+    { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true }
+  ];
+
+  if (props.hasRegistrationFee) {
+    columns.push({
+      name: "registrationPaid",
+      label: "Paid",
+      field: "registrationPaid",
+      align: "left"
+    });
+  }
+
+  columns.push({
+    name: "attendedAt",
+    label: "Status",
+    field: "attendedAt",
+    align: "left"
+  });
+
+  return columns;
+});
+
+const churchColumns = [
+  { name: "displayLastName", label: "Last name", field: "displayLastName", align: "left", sortable: true },
+  { name: "displayFirstName", label: "First name", field: "displayFirstName", align: "left", sortable: true },
   { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left" },
   { name: "attendedAt", label: "Status", field: "attendedAt", align: "left" },
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" }
@@ -178,7 +284,13 @@ const churchGroups = computed(() => {
     }
 
     const group = map.get(key);
-    group.participants.push(participant);
+    group.participants.push({
+      ...participant,
+      displayLastName: participant.lastName || participant.fullName || "—",
+      displayFirstName:
+        participant.firstName ||
+        (participant.lastName || !participant.fullName ? "—" : "")
+    });
     if (participant.attendedAt) {
       group.attendedCount += 1;
     }
@@ -188,9 +300,9 @@ const churchGroups = computed(() => {
     .map((group) => ({
       ...group,
       participants: group.participants.sort((a, b) => {
-        const last = (a.lastName || "").localeCompare(b.lastName || "");
+        const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
         if (last !== 0) return last;
-        return (a.firstName || "").localeCompare(b.firstName || "");
+        return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
       })
     }))
     .sort((a, b) => a.churchName.localeCompare(b.churchName));
@@ -244,7 +356,8 @@ async function loadQrCodes(participants) {
 }
 
 function onShow() {
-  if (churchGroups.value.length) {
+  viewMode.value = props.initialView === "church" ? "church" : "all";
+  if (viewMode.value === "church" && churchGroups.value.length) {
     selectChurch(churchGroups.value[0]);
   }
 }
@@ -253,17 +366,27 @@ function onHide() {
   selectedKey.value = null;
   qrByParticipant.value = {};
 }
+
+watch(viewMode, (mode) => {
+  if (mode === "church" && churchGroups.value.length && !selectedKey.value) {
+    selectChurch(churchGroups.value[0]);
+  }
+  if (mode === "all") {
+    selectedKey.value = null;
+    qrByParticipant.value = {};
+  }
+});
 </script>
 
 <style scoped lang="scss">
-.participants-by-church-dialog {
+.participants-view-dialog {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: #f5f7fa;
 }
 
-.participants-by-church-dialog__header {
+.participants-view-dialog__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -272,27 +395,39 @@ function onHide() {
   background: #fff;
 }
 
-.participants-by-church-dialog__heading {
+.participants-view-dialog__heading {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
 }
 
-.participants-by-church-dialog__title {
+.participants-view-dialog__title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
   color: #1a1a2e;
 }
 
-.participants-by-church-dialog__subtitle {
+.participants-view-dialog__subtitle {
   margin: 2px 0 0;
   font-size: 0.8rem;
   color: #6b7280;
 }
 
-.participants-by-church-dialog__body {
+.participants-view-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.participants-view-dialog__toggle {
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+}
+
+.participants-view-dialog__body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
@@ -302,11 +437,11 @@ function onHide() {
   margin: 0 auto;
 }
 
-.participants-by-church-dialog__cards {
+.participants-view-dialog__cards {
   margin-bottom: 16px;
 }
 
-.participants-by-church-dialog__stat-card {
+.participants-view-dialog__stat-card {
   cursor: pointer;
   border-radius: 8px;
   background: #fff;
@@ -317,16 +452,16 @@ function onHide() {
   }
 }
 
-.participants-by-church-dialog__stat-card--active {
+.participants-view-dialog__stat-card--active {
   border-color: #1976d2;
   box-shadow: 0 0 0 1px #1976d2;
 }
 
-.participants-by-church-dialog__stat-text {
+.participants-view-dialog__stat-text {
   min-width: 0;
 }
 
-.participants-by-church-dialog__stat-label {
+.participants-view-dialog__stat-label {
   font-size: 0.82rem;
   font-weight: 500;
   color: #2d3340;
@@ -336,18 +471,18 @@ function onHide() {
   white-space: nowrap;
 }
 
-.participants-by-church-dialog__stat-value {
+.participants-view-dialog__stat-value {
   font-size: 1.25rem;
   font-weight: 600;
   color: #1a1a2e;
   line-height: 1.2;
 }
 
-.participants-by-church-dialog__detail {
+.participants-view-dialog__detail {
   overflow: hidden;
 }
 
-.participants-by-church-dialog__detail-header {
+.participants-view-dialog__detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -357,32 +492,32 @@ function onHide() {
   background: #fafbfc;
 }
 
-.participants-by-church-dialog__detail-actions {
+.participants-view-dialog__detail-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.participants-by-church-dialog__detail-title {
+.participants-view-dialog__detail-title {
   margin: 0;
   font-size: 0.88rem;
   font-weight: 600;
   color: #1a1a2e;
 }
 
-.participants-by-church-dialog__detail-meta {
+.participants-view-dialog__detail-meta {
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: #6b7280;
 }
 
-.participants-by-church-dialog__qr img {
+.participants-view-dialog__qr img {
   width: 64px;
   height: 64px;
   display: block;
 }
 
-.participants-by-church-dialog__empty {
+.participants-view-dialog__empty {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -399,7 +534,16 @@ function onHide() {
 }
 
 @media (max-width: 599px) {
-  .participants-by-church-dialog__detail-header {
+  .participants-view-dialog__header {
+    flex-wrap: wrap;
+  }
+
+  .participants-view-dialog__toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .participants-view-dialog__detail-header {
     flex-wrap: wrap;
   }
 }

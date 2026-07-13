@@ -45,10 +45,15 @@
     <template v-if="dashboard.event">
       <section class="event-dashboard__stats row q-col-gutter-sm q-mb-md">
         <div class="col-6 col-sm-4 col-md-2">
-          <div class="event-stat-card">
+          <button
+            type="button"
+            class="event-stat-card event-stat-card--clickable"
+            @click="openParticipantsView('all')"
+          >
             <span class="event-stat-card__label">Participants</span>
             <span class="event-stat-card__value">{{ dashboard.stats.participantCount }}</span>
-          </div>
+            <span class="event-stat-card__hint">View list</span>
+          </button>
         </div>
         <div class="col-6 col-sm-4 col-md-2">
           <div class="event-stat-card">
@@ -244,7 +249,7 @@
               icon="church"
               label="By church"
               :disable="!dashboard.participants.length"
-              @click="participantsByChurchDialogOpen = true"
+              @click="openParticipantsView('church')"
             />
             <q-btn dense unelevated no-caps color="primary" icon="person_add" label="Add participant" @click="openParticipantDialog" />
           </div>
@@ -352,11 +357,13 @@
       :event="dashboard.event"
     />
 
-    <EventParticipantsByChurchDialog
-      v-model="participantsByChurchDialogOpen"
+    <EventParticipantsViewDialog
+      v-model="participantsViewDialogOpen"
       :event-id="eventId"
       :event="dashboard.event"
       :participants="dashboard.participants"
+      :has-registration-fee="hasRegistrationFee"
+      :initial-view="participantsViewInitialMode"
     />
 
     <q-dialog v-model="templateDialogOpen" persistent>
@@ -469,7 +476,7 @@ import EventFormDialog from "src/components/EventFormDialog.vue";
 import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
 import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
-import EventParticipantsByChurchDialog from "src/components/EventParticipantsByChurchDialog.vue";
+import EventParticipantsViewDialog from "src/components/EventParticipantsViewDialog.vue";
 import AppSelect from "src/components/AppSelect.vue";
 import {
   downloadEventParticipantBulkTemplate,
@@ -495,7 +502,8 @@ const loading = ref(false);
 const dashboard = ref({ event: null, participants: [], pledges: [], stats: {} });
 const editDialogOpen = ref(false);
 const registrationQrDialogOpen = ref(false);
-const participantsByChurchDialogOpen = ref(false);
+const participantsViewDialogOpen = ref(false);
+const participantsViewInitialMode = ref("all");
 const participantDialogOpen = ref(false);
 const participantMode = ref("create");
 const editingParticipant = ref(null);
@@ -597,6 +605,11 @@ function openParticipantDialog() {
   participantMode.value = "create";
   editingParticipant.value = null;
   participantDialogOpen.value = true;
+}
+
+function openParticipantsView(mode = "all") {
+  participantsViewInitialMode.value = mode;
+  participantsViewDialogOpen.value = true;
 }
 
 async function loadChurches() {
@@ -818,6 +831,31 @@ onMounted(loadDashboard);
   flex-direction: column;
   gap: 4px;
   min-height: 64px;
+  width: 100%;
+  text-align: left;
+}
+
+.event-stat-card--clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: #1976d2;
+    box-shadow: 0 2px 8px rgba(26, 26, 46, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+  }
+}
+
+.event-stat-card__hint {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #1976d2;
+  margin-top: 2px;
 }
 
 .event-stat-card__label {
