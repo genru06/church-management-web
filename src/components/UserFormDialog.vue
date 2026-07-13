@@ -42,7 +42,7 @@
             </div>
           </div>
 
-          <q-select
+          <AppSelect
             v-model="form.churchId"
             :options="churchOptions"
             label="Assigned church (for Pastor / Life Coach)"
@@ -70,6 +70,7 @@
 import { computed, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

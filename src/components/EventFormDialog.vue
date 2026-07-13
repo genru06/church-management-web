@@ -156,7 +156,16 @@
                 <q-input v-model="form.organizer" label="Organizer" dense outlined hide-bottom-space />
               </div>
               <div class="col-12 col-sm-6">
-                <q-input v-model="form.tags" label="Tags (comma-separated)" dense outlined hide-bottom-space />
+                <AppSelect
+                  v-model="form.tags"
+                  :options="tagOptions"
+                  label="Tags"
+                  multiple
+                  use-chips
+                  dense
+                  outlined
+                  hide-bottom-space
+                />
               </div>
               <div class="col-12 col-sm-6">
                 <q-input v-model="form.contactPerson" label="Contact person" dense outlined hide-bottom-space />
@@ -195,6 +204,7 @@ import {
   normalizeEventTime,
   toQuasarTimeValue
 } from "src/utils/eventTime";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -208,6 +218,7 @@ const $q = useQuasar();
 const formRef = ref(null);
 const loading = ref(false);
 const saving = ref(false);
+const tagOptions = ref([]);
 
 const requiredRule = (val) => !!val || "Required";
 
@@ -234,7 +245,7 @@ const emptyForm = () => ({
   registrationFee: 0,
   status: "draft",
   eventType: "internal",
-  tags: "",
+  tags: [],
   organizer: "",
   contactPerson: "",
   contactEmail: "",
@@ -278,7 +289,7 @@ async function loadEvent() {
       registrationFee: data.registrationFee || 0,
       status: data.status || "draft",
       eventType: data.eventType || "internal",
-      tags: data.tags || "",
+      tags: parseTags(data.tags),
       organizer: data.organizer || "",
       contactPerson: data.contactPerson || "",
       contactEmail: data.contactEmail || "",
@@ -293,6 +304,7 @@ async function loadEvent() {
 }
 
 async function onShow() {
+  await loadTags();
   await loadEvent();
 }
 
@@ -304,6 +316,7 @@ async function submit() {
   try {
     const payload = {
       ...form.value,
+      tags: form.value.tags.join(", "),
       eventTime: normalizeEventTime(form.value.eventTime)
     };
     const { data } =
@@ -324,6 +337,18 @@ async function submit() {
   } finally {
     saving.value = false;
   }
+}
+
+async function loadTags() {
+  const { data } = await api.get("/tags");
+  tagOptions.value = data.map((tag) => tag.name);
+}
+
+function parseTags(value) {
+  return String(value || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 watch(

@@ -62,15 +62,26 @@
                   <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
                 </p>
               </div>
-              <q-btn
-                dense
-                unelevated
-                no-caps
-                color="primary"
-                icon="download"
-                label="Export Excel"
-                @click="exportChurch(selectedGroup)"
-              />
+              <div class="participants-by-church-dialog__detail-actions">
+                <q-btn
+                  dense
+                  outline
+                  no-caps
+                  color="primary"
+                  icon="print"
+                  label="Print sheet"
+                  @click="printChurch(selectedGroup)"
+                />
+                <q-btn
+                  dense
+                  unelevated
+                  no-caps
+                  color="primary"
+                  icon="download"
+                  label="Export Excel"
+                  @click="exportChurch(selectedGroup)"
+                />
+              </div>
             </div>
 
             <q-table
@@ -119,9 +130,11 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
+import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
 
 const CARD_COLORS = ["primary", "secondary", "accent", "positive", "orange", "purple"];
 
@@ -135,6 +148,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const $q = useQuasar();
+const router = useRouter();
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
 
@@ -206,6 +220,10 @@ function exportChurch(group) {
     eventName: props.event?.name
   });
   $q.notify({ type: "positive", message: `Exported ${group.churchName} participants.` });
+}
+
+function printChurch(group) {
+  router.push(getAttendancePrintUrl(props.eventId, { churchKey: group.key }));
 }
 
 async function loadQrCodes(participants) {
@@ -337,6 +355,12 @@ function onHide() {
   padding: 12px 14px;
   border-bottom: 1px solid #eef1f6;
   background: #fafbfc;
+}
+
+.participants-by-church-dialog__detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .participants-by-church-dialog__detail-title {

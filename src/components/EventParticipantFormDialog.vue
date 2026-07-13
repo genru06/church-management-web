@@ -20,7 +20,7 @@
         <q-form ref="formRef" class="entity-dialog__form" @submit.prevent="submit">
           <div class="row q-col-gutter-sm">
             <div class="col-12">
-              <q-select
+              <AppSelect
                 v-model="form.memberId"
                 :options="memberOptions"
                 emit-value
@@ -74,6 +74,7 @@
 import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

@@ -1,24 +1,5 @@
 export const DEFAULT_CITY_ID = 998;
 
-export const memberTags = [
-  "Life Coach",
-  "Network Coach",
-  "SLI 1",
-  "SLI 2",
-  "SLI 3",
-  "SLI 4",
-  "Already Baptized",
-  "Pastor",
-  "Pastor's Wife",
-  "Executive Pastor",
-  "Church Administrator",
-  "Church Treasurer",
-  "Church Secretary",
-  "House Church Director",
-  "Church Discipleship Director",
-  "Church Planting Director",
-];
-
 export const members = [
   {
     id: 1,

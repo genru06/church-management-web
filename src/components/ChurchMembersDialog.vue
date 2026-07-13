@@ -33,6 +33,30 @@
             </q-td>
           </template>
 
+          <template #body-cell-linkType="props">
+            <q-td :props="props">
+              <span class="church-members-dialog__muted">{{ props.row.linkType || "—" }}</span>
+            </q-td>
+          </template>
+
+          <template #body-cell-tags="props">
+            <q-td :props="props">
+              <div v-if="props.row.tags?.length" class="church-members-dialog__tags">
+                <q-chip
+                  v-for="tag in props.row.tags"
+                  :key="tag"
+                  dense
+                  size="sm"
+                  :color="isKidsTag(tag) ? 'amber-2' : 'grey-2'"
+                  :text-color="isKidsTag(tag) ? 'amber-10' : 'grey-8'"
+                >
+                  {{ tag }}
+                </q-chip>
+              </div>
+              <span v-else class="church-members-dialog__muted">—</span>
+            </q-td>
+          </template>
+
           <template #body-cell-lifeGroup="props">
             <q-td :props="props">
               <span class="church-members-dialog__muted">{{ props.row.lifeGroup || "—" }}</span>
@@ -78,8 +102,14 @@ const columns = [
   { name: "lastName", label: "Last Name", field: "lastName", align: "left", sortable: true },
   { name: "firstName", label: "First Name", field: "firstName", align: "left", sortable: true },
   { name: "dateOfBirth", label: "Birthdate", field: "dateOfBirth", align: "left", sortable: true },
-  { name: "lifeGroup", label: "Lifegroup", field: "lifeGroup", align: "left", sortable: true }
+  { name: "linkType", label: "Link", field: "linkType", align: "left", sortable: true },
+  { name: "lifeGroup", label: "Lifegroup", field: "lifeGroup", align: "left", sortable: true },
+  { name: "tags", label: "Tags", field: "tags", align: "left" }
 ];
+
+function isKidsTag(tag) {
+  return String(tag || "").trim().toLowerCase() === "kids";
+}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -110,7 +140,7 @@ async function loadMembers() {
 
 <style scoped lang="scss">
 .church-members-dialog {
-  width: min(720px, 92vw);
+  width: min(860px, 92vw);
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -144,6 +174,12 @@ async function loadMembers() {
 
 .church-members-dialog__muted {
   color: #5c6370;
+}
+
+.church-members-dialog__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .church-members-dialog__empty {

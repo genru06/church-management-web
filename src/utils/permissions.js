@@ -35,7 +35,8 @@ export const PAGE_PERMISSIONS = {
   events: [USER_TAGS.SUPER_USER, USER_TAGS.EXECUTIVE_PASTOR, USER_TAGS.MAIN_CHURCH_ADMIN, USER_TAGS.PASTOR],
   operations: [USER_TAGS.SUPER_USER, USER_TAGS.EXECUTIVE_PASTOR, USER_TAGS.MAIN_CHURCH_ADMIN],
   attendance: [USER_TAGS.SUPER_USER, USER_TAGS.EXECUTIVE_PASTOR, USER_TAGS.MAIN_CHURCH_ADMIN, USER_TAGS.PASTOR, USER_TAGS.LIFE_COACH],
-  users: FULL_ACCESS_TAGS
+  users: FULL_ACCESS_TAGS,
+  tags: FULL_ACCESS_TAGS
 };
 
 export function canAccessPage(tags = [], page) {
@@ -67,7 +68,8 @@ export const NAV_ITEMS = [
   { label: "Events", to: "/events", icon: "event", page: "events" },
   { label: "Operations", to: "/operations", icon: "account_balance", page: "operations" },
   { label: "Attendance", to: "/attendance", icon: "event_available", page: "attendance" },
-  { label: "Users", to: "/users", icon: "manage_accounts", page: "users" }
+  { label: "Users", to: "/users", icon: "manage_accounts", page: "users" },
+  { label: "Tags", to: "/tags", icon: "sell", page: "tags" }
 ];
 
 export function filterNavByTags(tags = []) {

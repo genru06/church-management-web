@@ -15,12 +15,14 @@ import AttendancePage from "src/pages/AttendancePage.vue";
 import EventsListPage from "src/pages/EventsListPage.vue";
 import EventDashboardPage from "src/pages/EventDashboardPage.vue";
 import EventAttendancePage from "src/pages/EventAttendancePage.vue";
+import EventAttendancePrintPage from "src/pages/EventAttendancePrintPage.vue";
 import EventScanPage from "src/pages/EventScanPage.vue";
 import EventRegistrationPage from "src/pages/EventRegistrationPage.vue";
 import EventSignupPage from "src/pages/EventSignupPage.vue";
 import EventSignupQrPage from "src/pages/EventSignupQrPage.vue";
 import OperationsPage from "src/pages/OperationsPage.vue";
 import UsersListPage from "src/pages/UsersListPage.vue";
+import TagsPage from "src/pages/TagsPage.vue";
 
 const routes = [
   {
@@ -75,9 +77,11 @@ const routes = [
       { path: "events", component: EventsListPage, meta: { page: "events" } },
       { path: "events/:id", component: EventDashboardPage, props: true, meta: { page: "events" } },
       { path: "events/:id/attendance", component: EventAttendancePage, props: true, meta: { page: "events" } },
+      { path: "events/:id/attendance/print", component: EventAttendancePrintPage, props: true, meta: { page: "events" } },
       { path: "events/:id/scan", component: EventScanPage, props: true, meta: { page: "events" } },
       { path: "operations", component: OperationsPage, meta: { page: "operations" } },
-      { path: "users", component: UsersListPage, meta: { page: "users" } }
+      { path: "users", component: UsersListPage, meta: { page: "users" } },
+      { path: "tags", component: TagsPage, meta: { page: "tags" } }
     ]
   },
   { path: "/:catchAll(.*)*", redirect: "/dashboard" }

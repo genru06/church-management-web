@@ -34,7 +34,7 @@
         </q-card-section>
         <q-separator />
         <q-card-section>
-          <q-select
+          <AppSelect
             v-model="modal.lifeGroupId"
             :options="lifeGroupOptions"
             emit-value
@@ -59,6 +59,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import AppSelect from "src/components/AppSelect.vue";
 
 const $q = useQuasar();
 const showModal = ref(false);

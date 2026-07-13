@@ -102,14 +102,14 @@
                 <q-input v-model="form.address" label="Street address" dense outlined hide-bottom-space />
               </div>
               <div class="col-12 col-sm-6">
-                <q-select
+                <AppSelect
                   v-model="form.cityId"
                   :options="cityOptions"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  use-input
+                  always-searchable
                   input-debounce="300"
                   label="City"
                   dense
@@ -136,9 +136,9 @@
             <legend class="member-dialog__section-title">Church</legend>
             <div class="row q-col-gutter-sm">
               <div class="col-12">
-                <q-select
+                <AppSelect
                   v-model="form.churchId"
-                  :options="churchOptions"
+                  :options="allChurchOptions"
                   emit-value
                   map-options
                   clearable
@@ -155,9 +155,9 @@
             <legend class="member-dialog__section-title">Tags</legend>
             <div class="row q-col-gutter-sm">
               <div class="col-12">
-                <q-select
+                <AppSelect
                   v-model="form.tags"
-                  :options="memberTags"
+                  :options="tagOptions"
                   label="Tags"
                   multiple
                   use-chips
@@ -192,9 +192,10 @@
 import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
-import { DEFAULT_CITY_ID, memberTags } from "src/mocks/data";
+import { DEFAULT_CITY_ID } from "src/mocks/data";
 import { applyDefaultCity, ensureDefaultCityOption, toCityOption } from "src/utils/defaultCity";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -209,7 +210,8 @@ const formRef = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const cityOptions = ref([]);
-const churchOptions = ref([]);
+const allChurchOptions = ref([]);
+const tagOptions = ref([]);
 
 const genderOptions = ["Male", "Female"].map((v) => ({ label: v, value: v }));
 const maritalStatusOptions = ["Single", "Married", "Widowed", "Divorced", "Separated"].map((v) => ({
@@ -252,10 +254,15 @@ function resetForm() {
 
 async function loadChurches() {
   const { data } = await api.get("/churches");
-  churchOptions.value = data.map((church) => ({
+  allChurchOptions.value = data.map((church) => ({
     label: getChurchDisplayName(church),
     value: Number(church.id)
   }));
+}
+
+async function loadTags() {
+  const { data } = await api.get("/tags");
+  tagOptions.value = data.map((tag) => tag.name);
 }
 
 function normalizeChurchId(value) {
@@ -267,9 +274,9 @@ function normalizeChurchId(value) {
 function ensureChurchOption(churchId, churchName) {
   const id = normalizeChurchId(churchId);
   if (!id) return;
-  const exists = churchOptions.value.some((opt) => opt.value === id);
+  const exists = allChurchOptions.value.some((opt) => opt.value === id);
   if (!exists) {
-    churchOptions.value = [{ label: churchName || `Church #${id}`, value: id }, ...churchOptions.value];
+    allChurchOptions.value = [{ label: churchName || `Church #${id}`, value: id }, ...allChurchOptions.value];
   }
 }
 
@@ -329,7 +336,7 @@ async function loadMember() {
 }
 
 async function onShow() {
-  await Promise.all([loadCities(), loadChurches()]);
+  await Promise.all([loadCities(), loadChurches(), loadTags()]);
   await ensureDefaultCityOption(api, cityOptions);
   await loadMember();
 }

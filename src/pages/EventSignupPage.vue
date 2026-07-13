@@ -41,7 +41,7 @@
             />
           </div>
           <div class="col-12">
-            <q-select
+            <AppSelect
               v-model="form.churchId"
               :options="churchOptions"
               emit-value
@@ -55,7 +55,7 @@
             />
           </div>
           <div class="col-12">
-            <q-select
+            <AppSelect
               v-model="form.lifegroupId"
               :options="filteredLifegroupOptions"
               emit-value
@@ -98,6 +98,7 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { formatEventTime } from "src/utils/eventTime";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }

@@ -1,8 +1,11 @@
 export const MEMBER_BULK_SIGNATURE_KEY = "_template_signature";
 export const MEMBER_BULK_TEMPLATE_SIGNATURE = "LIFEGROUP_MEMBER_BULK_V1";
+export const MEMBER_BULK_TEMPLATE_SIGNATURE_V2 = "LIFEGROUP_MEMBER_BULK_V2";
+export const MEMBER_BULK_TEMPLATE_SIGNATURE_V3 = "LIFEGROUP_MEMBER_BULK_V3";
+export const MEMBER_BULK_CHURCH_ID_KEY = "_church_id";
 export const MEMBER_BULK_SHEET_NAME = "Members";
 
-export const MEMBER_BULK_COLUMNS = [
+export const MEMBER_BULK_COLUMNS_V2 = [
   { header: "First Name*", key: "firstName" },
   { header: "Last Name*", key: "lastName" },
   { header: "Email", key: "email" },
@@ -16,4 +19,11 @@ export const MEMBER_BULK_COLUMNS = [
   { header: "Gender", key: "gender" },
   { header: "Marital Status", key: "maritalStatus" },
   { header: "Nationality", key: "nationality" }
+];
+
+export const MEMBER_BULK_COLUMNS = [
+  { header: "First Name*", key: "firstName" },
+  { header: "Last Name*", key: "lastName" },
+  { header: "Tag", key: "tag" },
+  ...MEMBER_BULK_COLUMNS_V2.slice(2)
 ];

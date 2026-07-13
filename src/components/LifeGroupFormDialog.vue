@@ -38,35 +38,29 @@
                 />
               </div>
               <div class="col-12 col-sm-6">
-                <q-select
+                <AppSelect
                   v-model="form.churchId"
-                  :options="churchOptions"
+                  :options="allChurchOptions"
                   emit-value
                   map-options
-                  use-input
-                  input-debounce="0"
                   label="Church *"
                   dense
                   outlined
                   hide-bottom-space
                   :rules="[requiredRule]"
-                  @filter="onChurchFilter"
                 />
               </div>
               <div class="col-12 col-sm-6">
-                <q-select
+                <AppSelect
                   v-model="form.coachMemberId"
-                  :options="memberOptions"
+                  :options="allMemberOptions"
                   emit-value
                   map-options
-                  use-input
-                  input-debounce="0"
                   clearable
                   label="Coach"
                   dense
                   outlined
                   hide-bottom-space
-                  @filter="onCoachFilter"
                 />
               </div>
             </div>
@@ -96,6 +90,7 @@ import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -111,31 +106,8 @@ const loading = ref(false);
 const saving = ref(false);
 const allMemberOptions = ref([]);
 const allChurchOptions = ref([]);
-const memberOptions = ref([]);
-const churchOptions = ref([]);
 
 const requiredRule = (val) => !!val || "Required";
-
-function filterSelectOptions(allOptions, displayedOptions, val, update) {
-  update(() => {
-    if (!val) {
-      displayedOptions.value = allOptions.value;
-      return;
-    }
-    const needle = val.toLowerCase();
-    displayedOptions.value = allOptions.value.filter((opt) =>
-      opt.label.toLowerCase().includes(needle)
-    );
-  });
-}
-
-function onChurchFilter(val, update) {
-  filterSelectOptions(allChurchOptions, churchOptions, val, update);
-}
-
-function onCoachFilter(val, update) {
-  filterSelectOptions(allMemberOptions, memberOptions, val, update);
-}
 
 const emptyForm = () => ({
   name: "",
@@ -165,8 +137,6 @@ async function loadOptions() {
     label: getChurchDisplayName(c),
     value: c.id
   }));
-  memberOptions.value = allMemberOptions.value;
-  churchOptions.value = allChurchOptions.value;
 }
 
 async function loadLifeGroup() {

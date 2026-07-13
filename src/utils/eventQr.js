@@ -6,7 +6,7 @@ export function buildCheckInPayload(eventId, participant) {
   });
 }
 
-export async function generateQrDataUrl(text) {
+export async function generateQrDataUrl(text, size = 160) {
   const QRCode = (await import("qrcode")).default;
-  return QRCode.toDataURL(text, { width: 160, margin: 1 });
+  return QRCode.toDataURL(text, { width: size, margin: 1 });
 }

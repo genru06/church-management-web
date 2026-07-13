@@ -46,7 +46,8 @@
             <span class="church-stat-card__label">Members in this church</span>
             <span class="church-stat-card__value">{{ stats.memberCount }}</span>
             <span class="church-stat-card__meta">
-              {{ stats.directMemberCount }} linked directly · {{ stats.lifeGroupMemberCount }} via lifegroups
+              {{ stats.directMemberCount }} linked directly · {{ stats.lifeGroupMemberCount }} via lifegroups ·
+              {{ stats.kidsMemberCount }} Kids
             </span>
           </button>
           <button
@@ -123,6 +124,7 @@ const stats = computed(() => church.value.stats || {
   memberCount: 0,
   lifeGroupMemberCount: 0,
   directMemberCount: 0,
+  kidsMemberCount: 0,
   lifeGroupCount: 0,
   eventsParticipated: 0
 });

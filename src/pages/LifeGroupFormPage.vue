@@ -13,7 +13,7 @@
             <q-input v-model="form.name" label="LifeGroup Name" outlined dense />
           </div>
           <div class="col-12 col-md-6">
-            <q-select
+            <AppSelect
               v-model="form.coachMemberId"
               :options="coachOptions"
               emit-value
@@ -38,6 +38,7 @@ import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   mode: { type: String, default: "create" },

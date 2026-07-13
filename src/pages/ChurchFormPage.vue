@@ -19,7 +19,7 @@
             <q-input v-model="form.address" label="Church Address" outlined dense />
           </div>
           <div class="col-12 col-md-6">
-            <q-select
+            <AppSelect
               v-model="form.pastorMemberId"
               :options="pastorOptions"
               emit-value
@@ -45,6 +45,7 @@ import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   mode: { type: String, default: "create" },

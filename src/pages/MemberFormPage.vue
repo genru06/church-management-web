@@ -10,7 +10,7 @@
       <q-card-section>
         <q-form class="row q-col-gutter-md">
           <div class="col-12 col-md-4" v-for="field in fields" :key="field.key">
-            <q-select
+            <AppSelect
               v-if="field.key === 'city'"
               v-model="form.cityId"
               :options="cityOptions"
@@ -18,7 +18,7 @@
               option-value="value"
               emit-value
               map-options
-              use-input
+              always-searchable
               input-debounce="300"
               label="City"
               outlined
@@ -38,9 +38,9 @@
             />
           </div>
           <div class="col-12 col-md-4">
-            <q-select
+            <AppSelect
               v-model="form.churchId"
-              :options="churchOptions"
+              :options="allChurchOptions"
               emit-value
               map-options
               clearable
@@ -50,7 +50,7 @@
             />
           </div>
           <div class="col-12 col-md-4">
-            <q-select v-model="form.tags" :options="memberTags" label="Tags" multiple use-chips outlined dense />
+            <AppSelect v-model="form.tags" :options="tagOptions" label="Tags" multiple use-chips outlined dense />
           </div>
           <div class="col-12 row justify-end q-gutter-sm">
             <q-btn flat color="grey-8" icon="arrow_back" label="Cancel" to="/members" />
@@ -72,9 +72,10 @@ import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
-import { memberTags, DEFAULT_CITY_ID } from "../mocks/data";
+import { DEFAULT_CITY_ID } from "../mocks/data";
 import { applyDefaultCity, ensureDefaultCityOption, toCityOption } from "src/utils/defaultCity";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
+import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
   mode: { type: String, default: "create" },
@@ -83,7 +84,8 @@ const props = defineProps({
 const $q = useQuasar();
 const router = useRouter();
 const cityOptions = ref([]);
-const churchOptions = ref([]);
+const allChurchOptions = ref([]);
+const tagOptions = ref([]);
 const requiredRule = (val) => !!val || "This field is required";
 
 const fields = [
@@ -139,10 +141,15 @@ function submitForm() {
 
 async function loadChurches() {
   const { data } = await api.get("/churches");
-  churchOptions.value = data.map((church) => ({
+  allChurchOptions.value = data.map((church) => ({
     label: getChurchDisplayName(church),
     value: Number(church.id)
   }));
+}
+
+async function loadTags() {
+  const { data } = await api.get("/tags");
+  tagOptions.value = data.map((tag) => tag.name);
 }
 
 function normalizeChurchId(value) {
@@ -154,9 +161,9 @@ function normalizeChurchId(value) {
 function ensureChurchOption(churchId, churchName) {
   const id = normalizeChurchId(churchId);
   if (!id) return;
-  const exists = churchOptions.value.some((opt) => opt.value === id);
+  const exists = allChurchOptions.value.some((opt) => opt.value === id);
   if (!exists) {
-    churchOptions.value = [{ label: churchName || `Church #${id}`, value: id }, ...churchOptions.value];
+    allChurchOptions.value = [{ label: churchName || `Church #${id}`, value: id }, ...allChurchOptions.value];
   }
 }
 
@@ -181,7 +188,7 @@ function onCitySelected(value) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCities(), loadChurches()]);
+  await Promise.all([loadCities(), loadChurches(), loadTags()]);
   await ensureDefaultCityOption(api, cityOptions);
 
   if (props.mode !== "edit" || !props.id) {

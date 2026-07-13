@@ -5,15 +5,27 @@
         <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push(`/events/${eventId}`)" />
         <h1 class="entity-page__title">Attendance sheet</h1>
       </div>
-      <q-btn
-        dense
-        unelevated
-        no-caps
-        color="primary"
-        icon="qr_code_scanner"
-        label="Open scanner"
-        @click="router.push(`/events/${eventId}/scan`)"
-      />
+      <div class="entity-page__actions">
+        <q-btn
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="print"
+          label="Print sheet"
+          :disable="!participants.length"
+          @click="router.push(`/events/${eventId}/attendance/print`)"
+        />
+        <q-btn
+          dense
+          unelevated
+          no-caps
+          color="primary"
+          icon="qr_code_scanner"
+          label="Open scanner"
+          @click="router.push(`/events/${eventId}/scan`)"
+        />
+      </div>
     </header>
 
     <q-inner-loading :showing="loading">
