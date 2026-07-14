@@ -3,7 +3,6 @@
     :model-value="modelValue"
     persistent
     @update:model-value="$emit('update:modelValue', $event)"
-    @show="onShow"
   >
     <q-card class="entity-dialog">
       <header class="entity-dialog__header">
@@ -63,6 +62,22 @@
                   hide-bottom-space
                 />
               </div>
+              <div class="col-12">
+                <AppSelect
+                  :key="tagsSelectKey"
+                  v-model="form.tags"
+                  :options="tagOptions"
+                  label="Tags"
+                  multiple
+                  use-chips
+                  dense
+                  outlined
+                  hide-bottom-space
+                />
+                <div class="text-caption text-grey-6 q-mt-xs">
+                  A church can have multiple tags (for example House Church, Daughter Church, Outreach).
+                </div>
+              </div>
             </div>
           </fieldset>
         </q-form>
@@ -86,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
@@ -104,6 +119,8 @@ const formRef = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const pastorOptions = ref([]);
+const tagOptions = ref([]);
+const tagsSelectKey = ref(0);
 
 const requiredRule = (val) => !!val || "Required";
 
@@ -111,7 +128,8 @@ const emptyForm = () => ({
   name: "",
   shortName: "",
   address: "",
-  pastorMemberId: null
+  pastorMemberId: null,
+  tags: []
 });
 
 const form = ref(emptyForm());
@@ -134,6 +152,19 @@ async function loadPastors() {
   }));
 }
 
+async function loadTags() {
+  const { data } = await api.get("/tags");
+  tagOptions.value = data.map((tag) => tag.name).sort((a, b) => a.localeCompare(b));
+}
+
+function mergeTagOptions(churchTags = []) {
+  const merged = new Set(tagOptions.value);
+  for (const tag of churchTags) {
+    if (tag) merged.add(tag);
+  }
+  tagOptions.value = [...merged].sort((a, b) => a.localeCompare(b));
+}
+
 async function loadChurch() {
   if (props.mode !== "edit" || !props.churchId) {
     resetForm();
@@ -143,12 +174,16 @@ async function loadChurch() {
   loading.value = true;
   try {
     const { data } = await api.get(`/churches/${props.churchId}`);
+    mergeTagOptions(data.tags);
     form.value = {
       name: data.name || "",
       shortName: data.shortName || "",
       address: data.address || "",
-      pastorMemberId: data.pastorMemberId ?? null
+      pastorMemberId: data.pastorMemberId ?? null,
+      tags: [...(data.tags || [])]
     };
+    await nextTick();
+    tagsSelectKey.value += 1;
   } catch {
     $q.notify({ type: "negative", message: "Failed to load church." });
     close();
@@ -158,7 +193,7 @@ async function loadChurch() {
 }
 
 async function onShow() {
-  await loadPastors();
+  await Promise.all([loadPastors(), loadTags()]);
   await loadChurch();
 }
 
@@ -168,10 +203,14 @@ async function submit() {
 
   saving.value = true;
   try {
+    const payload = {
+      ...form.value,
+      tags: Array.isArray(form.value.tags) ? [...form.value.tags] : []
+    };
     const { data } =
       props.mode === "create"
-        ? await api.post("/churches", form.value)
-        : await api.put(`/churches/${props.churchId}`, form.value);
+        ? await api.post("/churches", payload)
+        : await api.put(`/churches/${props.churchId}`, payload);
 
     $q.notify({
       type: "positive",
@@ -189,9 +228,14 @@ async function submit() {
 }
 
 watch(
-  () => props.modelValue,
-  (open) => {
-    if (!open) resetForm();
+  () => [props.modelValue, props.churchId, props.mode],
+  async ([open]) => {
+    if (!open) {
+      resetForm();
+      tagsSelectKey.value = 0;
+      return;
+    }
+    await onShow();
   }
 );
 </script>

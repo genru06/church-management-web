@@ -33,6 +33,24 @@
             <dt class="entity-details__label">Pastor</dt>
             <dd class="entity-details__value">{{ church.pastorName || "—" }}</dd>
           </div>
+          <div class="entity-details__item entity-details__item--full">
+            <dt class="entity-details__label">Tags</dt>
+            <dd class="entity-details__value">
+              <div v-if="church.tags?.length" class="row q-gutter-xs">
+                <q-chip
+                  v-for="tag in church.tags"
+                  :key="tag"
+                  dense
+                  size="sm"
+                  color="blue-1"
+                  text-color="primary"
+                >
+                  {{ tag }}
+                </q-chip>
+              </div>
+              <span v-else>—</span>
+            </dd>
+          </div>
         </dl>
 
         <aside class="church-details-page__stats">

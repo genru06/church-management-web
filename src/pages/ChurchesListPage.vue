@@ -74,6 +74,24 @@
           </q-td>
         </template>
 
+        <template #body-cell-tags="props">
+          <q-td :props="props">
+            <div v-if="props.row.tags?.length" class="row q-gutter-xs">
+              <q-chip
+                v-for="tag in props.row.tags"
+                :key="tag"
+                dense
+                size="sm"
+                color="blue-1"
+                text-color="primary"
+              >
+                {{ tag }}
+              </q-chip>
+            </div>
+            <span v-else class="entity-table__muted">—</span>
+          </q-td>
+        </template>
+
         <template #body-cell-actions="props">
           <q-td :props="props" class="entity-table__actions">
             <q-btn flat dense round size="sm" color="grey-7" icon="visibility" @click="openDetailsDialog(props.row)">
@@ -141,6 +159,7 @@ const columns = [
   { name: "shortName", label: "Short name", field: "shortName", align: "left", sortable: true },
   { name: "address", label: "Address", field: "address", align: "left" },
   { name: "pastorName", label: "Pastor", field: "pastorName", align: "left", sortable: true },
+  { name: "tags", label: "Tags", field: "tags", align: "left" },
   { name: "actions", label: "", field: "actions", align: "right", style: "width: 96px" }
 ];
 
