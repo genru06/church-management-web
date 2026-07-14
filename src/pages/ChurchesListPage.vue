@@ -187,9 +187,11 @@ function openEditFromDetails(church) {
 }
 
 function onChurchSaved(church) {
-  const index = rows.value.findIndex((row) => row.id === church.id);
-  if (index >= 0) rows.value[index] = church;
-  else rows.value.unshift(church);
+  const tags = Array.isArray(church?.tags) ? church.tags : [];
+  const next = { ...church, tags };
+  const index = rows.value.findIndex((row) => Number(row.id) === Number(church.id));
+  if (index >= 0) rows.value[index] = next;
+  else rows.value.unshift(next);
 }
 
 function confirmDelete(row) {
