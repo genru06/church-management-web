@@ -84,9 +84,11 @@
               dense
               borderless
               clearable
+              multiple
+              use-chips
               emit-value
               map-options
-              placeholder="Filter by tag"
+              placeholder="Filter by tags"
               class="members-table__tag-select"
               @update:model-value="onTagFilterChange"
             >
@@ -255,7 +257,7 @@ const $q = useQuasar();
 const route = useRoute();
 const router = useRouter();
 const filter = ref("");
-const tagFilter = ref(null);
+const tagFilter = ref([]);
 const tagOptions = ref([]);
 const rawRows = ref([]);
 const loading = ref(false);
@@ -488,28 +490,58 @@ async function loadMembers() {
   loading.value = true;
   try {
     const params = {};
-    if (tagFilter.value) params.tag = tagFilter.value;
-    const { data } = await api.get("/members", { params });
+    if (tagFilter.value.length) params.tag = tagFilter.value;
+    const { data } = await api.get("/members", {
+      params,
+      paramsSerializer: {
+        indexes: null
+      }
+    });
     rawRows.value = data;
   } finally {
     loading.value = false;
   }
 }
 
+function normalizeRouteTags(queryTag) {
+  if (queryTag == null || queryTag === "") return [];
+  const values = Array.isArray(queryTag) ? queryTag : [queryTag];
+  const seen = new Set();
+  const tags = [];
+
+  values.forEach((entry) => {
+    String(entry)
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((tag) => {
+        const key = tag.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        tags.push(tag);
+      });
+  });
+
+  return tags;
+}
+
 function syncTagFilterFromRoute() {
-  const queryTag = route.query.tag;
-  tagFilter.value = queryTag ? String(Array.isArray(queryTag) ? queryTag[0] : queryTag) : null;
+  tagFilter.value = normalizeRouteTags(route.query.tag);
 }
 
 function onTagFilterChange(value) {
-  const nextTag = value || null;
-  tagFilter.value = nextTag;
-  const query = nextTag ? { tag: nextTag } : {};
+  const nextTags = Array.isArray(value) ? value.filter(Boolean) : [];
+  tagFilter.value = nextTags;
+  const query = nextTags.length ? { tag: nextTags } : {};
   router.replace({ path: "/members", query });
 }
 
 const emptyMessage = computed(() => {
-  if (tagFilter.value) return "No members with this tag.";
+  if (tagFilter.value.length) {
+    return tagFilter.value.length === 1
+      ? "No members with this tag."
+      : "No members with these tags.";
+  }
   if (filter.value) return "No members match your search.";
   return "No members yet.";
 });
@@ -703,8 +735,7 @@ watch(
   flex-wrap: wrap;
 }
 
-.members-table__search,
-.members-table__tag-select {
+.members-table__search {
   max-width: 260px;
 
   :deep(.q-field__control) {
@@ -723,7 +754,28 @@ watch(
 }
 
 .members-table__tag-select {
-  min-width: 160px;
+  min-width: 200px;
+  max-width: 420px;
+  flex: 1 1 220px;
+
+  :deep(.q-field__control) {
+    min-height: 30px;
+    padding: 2px 8px;
+    background: #f5f7fa;
+    border-radius: 6px;
+  }
+
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
+    font-size: 0.8rem;
+    padding: 0;
+    min-height: 24px;
+  }
+
+  :deep(.q-chip) {
+    margin: 1px 2px;
+    font-size: 0.72rem;
+  }
 }
 
 .members-table__name {

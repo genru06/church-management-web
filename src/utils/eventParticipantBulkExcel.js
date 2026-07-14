@@ -5,7 +5,8 @@ import {
   EVENT_PARTICIPANT_BULK_EVENT_ID_KEY,
   EVENT_PARTICIPANT_BULK_SIGNATURE_KEY,
   EVENT_PARTICIPANT_BULK_SHEET_NAME,
-  EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE
+  EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE,
+  VALID_EVENT_PARTICIPANT_BULK_SIGNATURES
 } from "src/constants/eventParticipantBulkImport";
 
 function normalizeCell(value) {
@@ -79,7 +80,7 @@ function resolveTemplateLayout(sheet) {
   const signatureMeta = readMetadataRow(sheet, 0);
   if (
     signatureMeta.key !== EVENT_PARTICIPANT_BULK_SIGNATURE_KEY ||
-    signatureMeta.value !== EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE
+    !VALID_EVENT_PARTICIPANT_BULK_SIGNATURES.includes(signatureMeta.value)
   ) {
     throw new Error(
       "This file is not a valid LifeGroup event participant import template. Download the template from this page and use that file."

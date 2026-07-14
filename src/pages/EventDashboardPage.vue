@@ -405,12 +405,14 @@
 
           <p v-if="templateScope === 'general'" class="event-participant-template-dialog__hint">
             This template includes the event identifier. Existing members are matched by name and linked
-            to the event. Names not found are added as event-only participants, not as members.
+            to the event. Names not found are added as event-only participants, not as members. Lifegroup
+            assignment requires a church template.
           </p>
           <p v-else class="event-participant-template-dialog__hint">
             The template includes hidden event and church identifiers. Existing members are matched by
             name and linked to the event. Names not found are created as members under the selected
-            church, then added as participants.
+            church, then added as participants. An optional Lifegroup column links each member to that
+            group under the selected church only; if it does not exist there, it is created.
           </p>
         </q-card-section>
 
