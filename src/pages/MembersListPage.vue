@@ -54,6 +54,7 @@
         :columns="columns"
         row-key="id"
         :filter="filter"
+        :filter-method="filterMembers"
         :loading="loading"
         flat
         dense
@@ -65,18 +66,6 @@
       >
         <template #top>
           <div class="members-table__toolbar">
-            <q-chip
-              v-if="tagFilter"
-              dense
-              removable
-              color="orange-2"
-              text-color="orange-10"
-              icon="sell"
-              class="members-table__tag-filter"
-              @remove="clearTagFilter"
-            >
-              Tag: {{ tagFilter }}
-            </q-chip>
             <q-input
               v-model="filter"
               dense
@@ -89,6 +78,22 @@
                 <q-icon name="search" size="18px" color="grey-6" />
               </template>
             </q-input>
+            <AppSelect
+              v-model="tagFilter"
+              :options="tagOptions"
+              dense
+              borderless
+              clearable
+              emit-value
+              map-options
+              placeholder="Filter by tag"
+              class="members-table__tag-select"
+              @update:model-value="onTagFilterChange"
+            >
+              <template #prepend>
+                <q-icon name="sell" size="18px" color="grey-6" />
+              </template>
+            </AppSelect>
           </div>
         </template>
 
@@ -100,23 +105,15 @@
           </q-td>
         </template>
 
-        <template #body-cell-email="props">
+        <template #body-cell-church="props">
           <q-td :props="props">
-            <span class="members-table__muted">{{ props.row.email || "—" }}</span>
+            <span class="members-table__muted">{{ props.row.church || "—" }}</span>
           </q-td>
         </template>
 
-        <template #body-cell-phone="props">
+        <template #body-cell-lifeGroup="props">
           <q-td :props="props">
-            <span class="members-table__muted">{{ props.row.phone || "—" }}</span>
-          </q-td>
-        </template>
-
-        <template #body-cell-address="props">
-          <q-td :props="props" class="members-table__address-cell">
-            <span class="members-table__address" :title="props.row.completeAddress">
-              {{ props.row.completeAddress }}
-            </span>
+            <span class="members-table__muted">{{ props.row.lifeGroup || "—" }}</span>
           </q-td>
         </template>
 
@@ -167,7 +164,7 @@
         <template #no-data>
           <div class="members-table__empty">
             <q-icon name="group_off" size="20px" color="grey-5" />
-            <span>{{ tagFilter ? "No members with this tag." : filter ? "No members match your search." : "No members yet." }}</span>
+            <span>{{ emptyMessage }}</span>
           </div>
         </template>
       </q-table>
@@ -258,7 +255,8 @@ const $q = useQuasar();
 const route = useRoute();
 const router = useRouter();
 const filter = ref("");
-const tagFilter = ref("");
+const tagFilter = ref(null);
+const tagOptions = ref([]);
 const rawRows = ref([]);
 const loading = ref(false);
 const uploading = ref(false);
@@ -300,6 +298,31 @@ function formatDate(value) {
     year: "numeric",
     month: "short",
     day: "numeric"
+  });
+}
+
+function filterMembers(rows, terms) {
+  const needle = String(terms || "")
+    .trim()
+    .toLowerCase();
+  if (!needle) return rows;
+
+  return rows.filter((row) => {
+    const haystack = [
+      row.firstName,
+      row.lastName,
+      row.church,
+      row.lifeGroup,
+      formatDate(row.dateOfBirth),
+      row.dateOfBirth,
+      row.tagsText,
+      ...(Array.isArray(row.tags) ? row.tags : [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(needle);
   });
 }
 
@@ -449,6 +472,18 @@ function confirmDelete(row) {
   });
 }
 
+async function loadTags() {
+  try {
+    const { data } = await api.get("/tags");
+    tagOptions.value = data.map((tag) => ({
+      label: tag.name,
+      value: tag.name
+    }));
+  } catch {
+    tagOptions.value = [];
+  }
+}
+
 async function loadMembers() {
   loading.value = true;
   try {
@@ -463,20 +498,28 @@ async function loadMembers() {
 
 function syncTagFilterFromRoute() {
   const queryTag = route.query.tag;
-  tagFilter.value = queryTag ? String(Array.isArray(queryTag) ? queryTag[0] : queryTag) : "";
+  tagFilter.value = queryTag ? String(Array.isArray(queryTag) ? queryTag[0] : queryTag) : null;
 }
 
-function clearTagFilter() {
-  tagFilter.value = "";
-  router.replace({ path: "/members", query: {} });
+function onTagFilterChange(value) {
+  const nextTag = value || null;
+  tagFilter.value = nextTag;
+  const query = nextTag ? { tag: nextTag } : {};
+  router.replace({ path: "/members", query });
 }
+
+const emptyMessage = computed(() => {
+  if (tagFilter.value) return "No members with this tag.";
+  if (filter.value) return "No members match your search.";
+  return "No members yet.";
+});
 
 const rows = computed(() =>
   rawRows.value.map((m) => ({
     ...m,
-    completeAddress: [m.address, m.barangay, m.city, m.country, m.zip]
-      .filter(Boolean)
-      .join(", ")
+    tagsText: Array.isArray(m.tags) ? m.tags.join(" ") : "",
+    church: m.church || "",
+    lifeGroup: m.lifeGroup || ""
   }))
 );
 
@@ -489,22 +532,15 @@ const columns = [
     sortable: true,
     sort: (_, __, rowA, rowB) => compareMemberNames(rowA, rowB)
   },
-  { name: "email", label: "Email", field: "email", align: "left", sortable: true },
-  { name: "phone", label: "Phone", field: "phone", align: "left" },
-  {
-    name: "address",
-    label: "Address",
-    field: "completeAddress",
-    align: "left",
-    style: "max-width: 220px"
-  },
+  { name: "church", label: "Church", field: "church", align: "left", sortable: true },
+  { name: "lifeGroup", label: "Lifegroup", field: "lifeGroup", align: "left", sortable: true },
   { name: "dateOfBirth", label: "Birthdate", field: "dateOfBirth", align: "left", sortable: true },
   { name: "actions", label: "", field: "actions", align: "right", style: "width: 96px" }
 ];
 
 onMounted(async () => {
   syncTagFilterFromRoute();
-  await loadMembers();
+  await Promise.all([loadTags(), loadMembers()]);
 });
 
 watch(
@@ -667,11 +703,8 @@ watch(
   flex-wrap: wrap;
 }
 
-.members-table__tag-filter {
-  font-size: 0.75rem;
-}
-
-.members-table__search {
+.members-table__search,
+.members-table__tag-select {
   max-width: 260px;
 
   :deep(.q-field__control) {
@@ -682,10 +715,15 @@ watch(
     border-radius: 6px;
   }
 
-  :deep(.q-field__native) {
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
     font-size: 0.8rem;
     padding: 0;
   }
+}
+
+.members-table__tag-select {
+  min-width: 160px;
 }
 
 .members-table__name {
@@ -701,19 +739,6 @@ watch(
 
 .members-table__muted {
   color: #5c6370;
-}
-
-.members-table__address-cell {
-  max-width: 220px;
-}
-
-.members-table__address {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #5c6370;
-  font-size: 0.78rem;
 }
 
 .members-table__actions {
