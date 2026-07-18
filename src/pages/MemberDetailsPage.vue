@@ -36,6 +36,15 @@
           </div>
         </dl>
       </section>
+
+      <section v-if="qrDataUrl" class="member-profile__panel member-profile__qr">
+        <h2 class="member-profile__section-title">Member QR code</h2>
+        <p class="member-profile__qr-note">
+          Unique identifier for event check-in. Use this same code for every event.
+        </p>
+        <img :src="qrDataUrl" :alt="`${fullName} QR code`" class="member-profile__qr-image" />
+        <p class="member-profile__qr-id">ID #{{ member.id }}</p>
+      </section>
     </div>
 
     <MemberFormDialog
@@ -48,16 +57,32 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
+import { generateMemberQrDataUrl } from "src/utils/memberQr";
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
 const router = useRouter();
 const member = ref({});
 const loading = ref(false);
 const formDialogOpen = ref(false);
+const qrDataUrl = ref("");
+
+async function refreshQr(memberData) {
+  if (!memberData?.id || !memberData?.qrToken) {
+    qrDataUrl.value = "";
+    return;
+  }
+  try {
+    qrDataUrl.value = await generateMemberQrDataUrl(memberData);
+  } catch {
+    qrDataUrl.value = "";
+  }
+}
+
+watch(member, (value) => refreshQr(value), { immediate: true });
 
 const fullName = computed(() => {
   const { firstName, lastName } = member.value;
@@ -190,6 +215,37 @@ onMounted(async () => {
   border: 1px solid #e4e8ef;
   border-radius: 8px;
   padding: 12px 14px;
+}
+
+.member-profile__qr {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.member-profile__section-title {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.member-profile__qr-note {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.member-profile__qr-image {
+  width: 200px;
+  height: 200px;
+  display: block;
+  margin: 0 auto;
+}
+
+.member-profile__qr-id {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #8b93a1;
 }
 
 .member-profile__tags {

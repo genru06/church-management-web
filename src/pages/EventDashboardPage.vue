@@ -121,6 +121,12 @@
                 {{ dashboard.event.registrationFee > 0 ? formatCurrency(dashboard.event.registrationFee) : "Free" }}
               </dd>
             </div>
+            <div class="entity-details__item">
+              <dt class="entity-details__label">Pre-registration</dt>
+              <dd class="entity-details__value">
+                {{ dashboard.event.requiresPreRegistration ? "Required" : "Not required" }}
+              </dd>
+            </div>
             <div class="entity-details__item entity-details__item--full">
               <dt class="entity-details__label">Description</dt>
               <dd class="entity-details__value">{{ dashboard.event.description }}</dd>

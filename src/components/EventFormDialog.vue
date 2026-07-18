@@ -146,6 +146,17 @@
               <div class="col-12 col-sm-4 flex items-center">
                 <q-toggle v-model="form.allowPledges" label="Allow pledges" dense />
               </div>
+              <div class="col-12">
+                <q-toggle
+                  v-model="form.requiresPreRegistration"
+                  label="Require pre-registration"
+                  dense
+                />
+                <p class="entity-table__muted q-mt-xs q-mb-none" style="font-size: 0.78rem">
+                  When enabled, only registered members can check in. When disabled, scanning a
+                  member QR automatically records attendance.
+                </p>
+              </div>
             </div>
           </fieldset>
 
@@ -249,7 +260,8 @@ const emptyForm = () => ({
   organizer: "",
   contactPerson: "",
   contactEmail: "",
-  allowPledges: false
+  allowPledges: false,
+  requiresPreRegistration: false
 });
 
 const form = ref(emptyForm());
@@ -293,7 +305,8 @@ async function loadEvent() {
       organizer: data.organizer || "",
       contactPerson: data.contactPerson || "",
       contactEmail: data.contactEmail || "",
-      allowPledges: !!data.allowPledges
+      allowPledges: !!data.allowPledges,
+      requiresPreRegistration: !!data.requiresPreRegistration
     };
   } catch {
     $q.notify({ type: "negative", message: "Failed to load event." });

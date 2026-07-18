@@ -10,7 +10,15 @@
     <section class="entity-page__panel q-mb-md">
       <div class="event-scan-page__intro">
         <h2>{{ event?.name || "Event check-in" }}</h2>
-        <p>Scan a participant QR code to mark attendance.</p>
+        <p>
+          Scan a member QR code to mark attendance.
+          <span v-if="event?.requiresPreRegistration">
+            Pre-registration is required for this event.
+          </span>
+          <span v-else>
+            Pre-registration is not required — walk-ins are checked in automatically.
+          </span>
+        </p>
       </div>
     </section>
 
@@ -23,7 +31,14 @@
       <div class="event-scan-page__manual">
         <h3>Manual check-in</h3>
         <p class="entity-table__muted">Paste QR payload JSON if camera scanning is unavailable.</p>
-        <q-input v-model="manualPayload" type="textarea" autogrow dense outlined placeholder='{"eventId":1,"participantId":2,"token":"..."}' />
+        <q-input
+          v-model="manualPayload"
+          type="textarea"
+          autogrow
+          dense
+          outlined
+          placeholder='{"type":"member","memberId":1,"token":"..."}'
+        />
         <q-btn unelevated no-caps color="primary" label="Submit" class="q-mt-sm" :loading="checkingIn" @click="submitManual" />
       </div>
     </section>
@@ -37,6 +52,19 @@
         </q-card-section>
         <q-card-actions align="center">
           <q-btn unelevated no-caps color="primary" label="Continue scanning" @click="resultDialogOpen = false" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="alertDialogOpen" persistent>
+      <q-card class="entity-dialog">
+        <q-card-section class="text-center">
+          <q-icon name="warning" color="warning" size="48px" />
+          <h3 class="q-mt-md q-mb-xs">Not registered</h3>
+          <p>{{ alertMessage }}</p>
+        </q-card-section>
+        <q-card-actions align="center">
+          <q-btn unelevated no-caps color="primary" label="Continue scanning" @click="alertDialogOpen = false" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -64,9 +92,28 @@ const manualPayload = ref("");
 const checkingIn = ref(false);
 const resultDialogOpen = ref(false);
 const checkInResult = ref(null);
+const alertDialogOpen = ref(false);
+const alertMessage = ref("");
 
 let scanner = null;
 let processing = false;
+
+function extractErrorMessage(err, fallback) {
+  const message = err?.response?.data?.message;
+  if (Array.isArray(message)) return message[0] || fallback;
+  if (typeof message === "object" && message?.message) return message.message;
+  if (typeof message === "string") return message;
+  return fallback;
+}
+
+function isNotRegisteredError(err) {
+  const data = err?.response?.data;
+  const message = data?.message;
+  if (message?.code === "NOT_REGISTERED") return true;
+  if (data?.code === "NOT_REGISTERED") return true;
+  const text = extractErrorMessage(err, "");
+  return /not registered to attend/i.test(text);
+}
 
 async function processPayload(rawText) {
   if (processing) return;
@@ -74,20 +121,35 @@ async function processPayload(rawText) {
 
   try {
     const payload = JSON.parse(rawText);
-    if (Number(payload.eventId) !== Number(eventId)) {
+    const isMemberQr = payload.type === "member" || (!!payload.memberId && !payload.participantId);
+
+    // Participant QR codes are still event-scoped
+    if (!isMemberQr && Number(payload.eventId) !== Number(eventId)) {
       $q.notify({ type: "warning", message: "QR code is for a different event." });
       return;
     }
 
-    const { data } = await api.post(`/events/${eventId}/checkin`, {
-      participantId: payload.participantId,
-      token: payload.token
-    });
+    const body = isMemberQr
+      ? { type: "member", memberId: payload.memberId, token: payload.token }
+      : { participantId: payload.participantId, token: payload.token };
+
+    const { data } = await api.post(`/events/${eventId}/checkin`, body);
 
     checkInResult.value = data;
     resultDialogOpen.value = true;
-  } catch {
-    $q.notify({ type: "negative", message: "Invalid or unreadable QR code." });
+  } catch (err) {
+    if (isNotRegisteredError(err)) {
+      alertMessage.value = extractErrorMessage(
+        err,
+        `This member is not registered to attend this ${event.value?.name || "event"}.`
+      );
+      alertDialogOpen.value = true;
+      return;
+    }
+    $q.notify({
+      type: "negative",
+      message: extractErrorMessage(err, "Invalid or unreadable QR code.")
+    });
   } finally {
     processing = false;
   }
