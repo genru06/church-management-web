@@ -1,4 +1,13 @@
 export function buildCheckInPayload(eventId, participant) {
+  // Prefer the member's permanent QR when linked — works across all events
+  if (participant.memberId && participant.memberQrToken) {
+    return JSON.stringify({
+      type: "member",
+      memberId: Number(participant.memberId),
+      token: participant.memberQrToken
+    });
+  }
+
   return JSON.stringify({
     eventId: Number(eventId),
     participantId: participant.id,

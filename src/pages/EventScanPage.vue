@@ -121,23 +121,48 @@ async function processPayload(rawText) {
 
   try {
     const payload = JSON.parse(rawText);
-    const isMemberQr = payload.type === "member" || (!!payload.memberId && !payload.participantId);
+    const memberId = payload.memberId != null && payload.memberId !== "" ? Number(payload.memberId) : null;
+    const participantId =
+      payload.participantId != null && payload.participantId !== "" ? Number(payload.participantId) : null;
+    const token = payload.token?.trim?.() || payload.token;
+    const isMemberQr =
+      String(payload.type || "").toLowerCase() === "member" ||
+      (Number.isFinite(memberId) && memberId > 0 && token && !Number.isFinite(participantId));
 
-    // Participant QR codes are still event-scoped
-    if (!isMemberQr && Number(payload.eventId) !== Number(eventId)) {
+    if (isMemberQr) {
+      const { data } = await api.post(`/events/${eventId}/checkin`, {
+        type: "member",
+        memberId,
+        token
+      });
+      checkInResult.value = data;
+      resultDialogOpen.value = true;
+      return;
+    }
+
+    // Participant / guest QR codes are event-scoped
+    if (payload.eventId != null && Number(payload.eventId) !== Number(eventId)) {
       $q.notify({ type: "warning", message: "QR code is for a different event." });
       return;
     }
 
-    const body = isMemberQr
-      ? { type: "member", memberId: payload.memberId, token: payload.token }
-      : { participantId: payload.participantId, token: payload.token };
+    if (!Number.isFinite(participantId) || participantId <= 0 || !token) {
+      $q.notify({ type: "negative", message: "Unrecognized QR code. Scan a member or participant QR." });
+      return;
+    }
 
-    const { data } = await api.post(`/events/${eventId}/checkin`, body);
+    const { data } = await api.post(`/events/${eventId}/checkin`, {
+      participantId,
+      token
+    });
 
     checkInResult.value = data;
     resultDialogOpen.value = true;
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      $q.notify({ type: "negative", message: "Invalid or unreadable QR code." });
+      return;
+    }
     if (isNotRegisteredError(err)) {
       alertMessage.value = extractErrorMessage(
         err,
