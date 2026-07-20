@@ -52,6 +52,9 @@
           <q-td :props="props">
             <div class="text-weight-medium">{{ props.row.fullName }}</div>
             <div class="text-caption text-grey-7">@{{ props.row.username }}</div>
+            <div v-if="props.row.memberName" class="text-caption text-grey-6">
+              Member: {{ props.row.memberName }}
+            </div>
           </q-td>
         </template>
 

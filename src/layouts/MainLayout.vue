@@ -102,6 +102,7 @@ const tagIcon = computed(() => {
   if (tag === "Super User" || tag === "Main Church Admin") return "admin_panel_settings";
   if (tag === "Executive Pastor" || tag === "Pastor") return "church";
   if (tag === "Life Coach") return "groups";
+  if (tag === "Events Manager") return "event";
   return "badge";
 });
 
