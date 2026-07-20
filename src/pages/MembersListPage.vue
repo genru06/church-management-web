@@ -37,6 +37,17 @@
           @change="onUploadSelected"
         />
         <q-btn
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="print"
+          label="Print list"
+          class="members-page__secondary-btn"
+          :disable="!rows.length || loading"
+          @click="openPrintPage"
+        />
+        <q-btn
           v-if="auth.canDo('action.members.create')"
           dense
           unelevated
@@ -256,6 +267,7 @@ import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import { downloadMemberBulkTemplate, parseMemberBulkUpload } from "src/utils/memberBulkExcel";
 import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
+import { getMembersPrintUrl } from "src/utils/memberPrint";
 
 const $q = useQuasar();
 const auth = useAuthStore();
@@ -337,6 +349,10 @@ function openCreateDialog() {
   formMode.value = "create";
   editingMemberId.value = null;
   formDialogOpen.value = true;
+}
+
+function openPrintPage() {
+  router.push(getMembersPrintUrl({ tags: tagFilter.value }));
 }
 
 function openEditDialog(row) {

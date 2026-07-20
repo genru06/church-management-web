@@ -1,6 +1,33 @@
+export function getEventSignupPath(eventId) {
+  return `/events/${eventId}/signup`;
+}
+
+export function getEventSignupQrPath(eventId) {
+  return `/events/${eventId}/signup-qr`;
+}
+
+function appBasePath() {
+  const base = (process.env.VUE_ROUTER_BASE || "/").replace(/\/+$/, "");
+  return base === "" ? "" : base;
+}
+
+function absoluteAppPath(path) {
+  const base = appBasePath();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!base) return normalizedPath;
+  return `${base}${normalizedPath}`.replace(/\/{2,}/g, "/");
+}
+
 export function getEventSignupUrl(eventId) {
-  if (typeof window === "undefined") return `/events/${eventId}/signup`;
-  return `${window.location.origin}/events/${eventId}/signup`;
+  const path = getEventSignupPath(eventId);
+  if (typeof window === "undefined") return absoluteAppPath(path);
+
+  const origin = window.location.origin;
+  const hashMode = process.env.VUE_ROUTER_MODE !== "history";
+  if (hashMode) {
+    return `${origin}${appBasePath() || ""}#${path}`;
+  }
+  return `${origin}${absoluteAppPath(path)}`;
 }
 
 export function isRegistrationOpen(event) {
@@ -31,8 +58,15 @@ export function getRegistrationClosedReason(event) {
 }
 
 export function getEventSignupQrUrl(eventId) {
-  if (typeof window === "undefined") return `/events/${eventId}/signup-qr`;
-  return `${window.location.origin}/events/${eventId}/signup-qr`;
+  const path = getEventSignupQrPath(eventId);
+  if (typeof window === "undefined") return absoluteAppPath(path);
+
+  const origin = window.location.origin;
+  const hashMode = process.env.VUE_ROUTER_MODE !== "history";
+  if (hashMode) {
+    return `${origin}${appBasePath() || ""}#${path}`;
+  }
+  return `${origin}${absoluteAppPath(path)}`;
 }
 
 export async function generateRegistrationQrDataUrl(eventId, size = 240) {

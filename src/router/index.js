@@ -3,6 +3,7 @@ import { createRouter, createMemoryHistory, createWebHistory, createWebHashHisto
 import routes from "./routes";
 import { useAuthStore } from "src/stores/auth";
 import { canAccessPage } from "src/utils/permissions";
+import { isPublicPath, isPublicRouteRecord } from "src/utils/publicRoutes";
 
 export default route(function ({ store }) {
   const createHistory = process.env.SERVER
@@ -14,13 +15,13 @@ export default route(function ({ store }) {
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
+    strict: false,
     history: createHistory(process.env.VUE_ROUTER_BASE)
   });
 
   Router.beforeEach((to, _from, next) => {
     const auth = useAuthStore(store);
-    // Check matched records — nested public routes may not expose meta on `to.meta` alone
-    const isPublic = to.matched.some((record) => record.meta?.public === true);
+    const isPublic = isPublicPath(to.path) || isPublicRouteRecord(to);
 
     if (isPublic) {
       if (to.path === "/login" && auth.isAuthenticated) {

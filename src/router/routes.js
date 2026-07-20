@@ -3,6 +3,7 @@ import PublicLayout from "src/layouts/PublicLayout.vue";
 import LoginPage from "src/pages/LoginPage.vue";
 import DashboardPage from "src/pages/DashboardPage.vue";
 import MembersListPage from "src/pages/MembersListPage.vue";
+import MembersPrintPage from "src/pages/MembersPrintPage.vue";
 import MemberFormPage from "src/pages/MemberFormPage.vue";
 import MemberDetailsPage from "src/pages/MemberDetailsPage.vue";
 import ChurchesListPage from "src/pages/ChurchesListPage.vue";
@@ -78,6 +79,7 @@ const routes = [
       { path: "", redirect: "/dashboard" },
       { path: "dashboard", component: DashboardPage, meta: { page: "dashboard" } },
       { path: "members", component: MembersListPage, meta: { page: "members" } },
+      { path: "members/print", component: MembersPrintPage, meta: { page: "members" } },
       { path: "members/add", component: MemberFormPage, props: { mode: "create" }, meta: { page: "members" } },
       { path: "members/:id", component: MemberDetailsPage, props: true, meta: { page: "members" } },
       { path: "members/:id/edit", component: MemberFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "members" } },

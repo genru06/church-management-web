@@ -1,23 +1,18 @@
 import { boot } from "quasar/wrappers";
 import axios from "axios";
 import { useAuthStore } from "src/stores/auth";
+import { currentPublicPath, isPublicApiPath, isPublicRouteRecord } from "src/utils/publicRoutes";
 
 const api = axios.create({
   baseURL: process.env.API_URL
 });
 
-function isPublicApiUrl(url = "") {
-  const path = String(url).split("?")[0];
+function isPublicRequest(router, requestUrl) {
   return (
-    /\/events\/[^/]+\/signup\/?$/.test(path) ||
-    /\/events\/[^/]+\/register\/[^/]+(\/pay)?\/?$/.test(path) ||
-    /\/auth\/login\/?$/.test(path) ||
-    /\/health\/?$/.test(path)
+    isPublicApiPath(requestUrl) ||
+    isPublicRouteRecord(router?.currentRoute?.value) ||
+    isPublicRouteRecord({ path: currentPublicPath() })
   );
-}
-
-function isPublicRoute(router) {
-  return router.currentRoute.value.matched.some((record) => record.meta?.public === true);
 }
 
 export default boot(({ app, router }) => {
@@ -25,14 +20,14 @@ export default boot(({ app, router }) => {
   app.config.globalProperties.$api = api;
 
   api.interceptors.request.use((config) => {
-    // Keep public registration flows credential-free even if a stale token exists
-    if (isPublicApiUrl(config.url) || isPublicRoute(router)) {
+    if (isPublicRequest(router, config.url)) {
       if (config.headers) {
         delete config.headers.Authorization;
         delete config.headers.authorization;
       }
       return config;
     }
+
     const auth = useAuthStore();
     if (auth.token) {
       config.headers.Authorization = `Bearer ${auth.token}`;
@@ -43,15 +38,11 @@ export default boot(({ app, router }) => {
   api.interceptors.response.use(
     (response) => response,
     (error) => {
-      if (error.response?.status === 401) {
-        const publicPage = isPublicRoute(router);
-        const publicApi = isPublicApiUrl(error.config?.url);
-        if (!publicPage && !publicApi) {
-          const auth = useAuthStore();
-          auth.clearSession();
-          if (router.currentRoute.value.path !== "/login") {
-            router.push("/login");
-          }
+      if (error.response?.status === 401 && !isPublicRequest(router, error.config?.url)) {
+        const auth = useAuthStore();
+        auth.clearSession();
+        if (router.currentRoute.value.path !== "/login") {
+          router.push("/login");
         }
       }
       return Promise.reject(error);
