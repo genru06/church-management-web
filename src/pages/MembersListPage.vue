@@ -7,6 +7,7 @@
       </div>
       <div class="members-page__actions">
         <q-btn
+          v-if="auth.canDo('action.members.import')"
           dense
           flat
           no-caps
@@ -17,6 +18,7 @@
           @click="openTemplateDialog"
         />
         <q-btn
+          v-if="auth.canDo('action.members.import')"
           dense
           flat
           no-caps
@@ -35,6 +37,7 @@
           @change="onUploadSelected"
         />
         <q-btn
+          v-if="auth.canDo('action.members.create')"
           dense
           unelevated
           no-caps
@@ -248,12 +251,14 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import { downloadMemberBulkTemplate, parseMemberBulkUpload } from "src/utils/memberBulkExcel";
 import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const $q = useQuasar();
+const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const filter = ref("");

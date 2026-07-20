@@ -51,12 +51,12 @@
 
     <section class="entity-page__panel">
       <q-tabs v-model="activeTab" dense align="left" active-color="primary" indicator-color="primary" class="operations-tabs">
-        <q-tab name="tithes" label="Tithes" icon="savings" no-caps />
-        <q-tab name="offerings" label="Offerings" icon="volunteer_activism" no-caps />
-        <q-tab name="pledges" label="Pledges" icon="handshake" no-caps />
-        <q-tab name="registration" label="Registration Fees" icon="receipt_long" no-caps />
-        <q-tab name="expenses" label="Expenses" icon="payments" no-caps />
-        <q-tab name="vouchers" label="Vouchers" icon="description" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.tithes')" name="tithes" label="Tithes" icon="savings" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.offerings')" name="offerings" label="Offerings" icon="volunteer_activism" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.pledges')" name="pledges" label="Pledges" icon="handshake" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.registration')" name="registration" label="Registration Fees" icon="receipt_long" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.expenses')" name="expenses" label="Expenses" icon="payments" no-caps />
+        <q-tab v-if="auth.canTab('tab.operations.vouchers')" name="vouchers" label="Vouchers" icon="description" no-caps />
       </q-tabs>
       <q-separator />
 
@@ -65,7 +65,16 @@
         <q-tab-panel name="tithes" class="q-pa-none">
           <div class="operations-section-header">
             <h2>Tithes</h2>
-            <q-btn dense unelevated no-caps color="primary" icon="add" label="Add tithe" @click="openCashCountDialog('tithe')" />
+            <q-btn
+              v-if="auth.canDo('action.operations.add_tithe')"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="add"
+              label="Add tithe"
+              @click="openCashCountDialog('tithe')"
+            />
           </div>
           <q-table
             :rows="tithes"
@@ -99,7 +108,16 @@
         <q-tab-panel name="offerings" class="q-pa-none">
           <div class="operations-section-header">
             <h2>Offerings</h2>
-            <q-btn dense unelevated no-caps color="primary" icon="add" label="Add offering" @click="openCashCountDialog('offering')" />
+            <q-btn
+              v-if="auth.canDo('action.operations.add_offering')"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="add"
+              label="Add offering"
+              @click="openCashCountDialog('offering')"
+            />
           </div>
           <q-table
             :rows="offerings"
@@ -217,7 +235,16 @@
         <q-tab-panel name="expenses" class="q-pa-none">
           <div class="operations-section-header">
             <h2>Expenses</h2>
-            <q-btn dense unelevated no-caps color="primary" icon="add" label="Add expense" @click="openExpenseDialog" />
+            <q-btn
+              v-if="auth.canDo('action.operations.add_expense')"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="add"
+              label="Add expense"
+              @click="openExpenseDialog"
+            />
           </div>
           <q-table
             :rows="expenses"
@@ -251,7 +278,16 @@
         <q-tab-panel name="vouchers" class="q-pa-none">
           <div class="operations-section-header">
             <h2>Vouchers</h2>
-            <q-btn dense unelevated no-caps color="primary" icon="add" label="Add voucher" @click="openVoucherDialog" />
+            <q-btn
+              v-if="auth.canDo('action.operations.add_voucher')"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="add"
+              label="Add voucher"
+              @click="openVoucherDialog"
+            />
           </div>
           <q-table
             :rows="vouchers"
@@ -316,19 +352,41 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import CashCountFormDialog from "src/components/CashCountFormDialog.vue";
 import ExpenseFormDialog from "src/components/ExpenseFormDialog.vue";
 import VoucherFormDialog from "src/components/VoucherFormDialog.vue";
 
 const $q = useQuasar();
 const router = useRouter();
+const auth = useAuthStore();
+
+const OPERATION_TABS = [
+  { name: "tithes", key: "tab.operations.tithes" },
+  { name: "offerings", key: "tab.operations.offerings" },
+  { name: "pledges", key: "tab.operations.pledges" },
+  { name: "registration", key: "tab.operations.registration" },
+  { name: "expenses", key: "tab.operations.expenses" },
+  { name: "vouchers", key: "tab.operations.vouchers" }
+];
+
+const allowedTabs = computed(() => OPERATION_TABS.filter((t) => auth.canTab(t.key)).map((t) => t.name));
+const activeTab = ref("tithes");
+
+watch(
+  allowedTabs,
+  (tabs) => {
+    if (!tabs.length) return;
+    if (!tabs.includes(activeTab.value)) activeTab.value = tabs[0];
+  },
+  { immediate: true }
+);
 
 const loading = ref(false);
-const activeTab = ref("tithes");
 const summary = ref({
   tithesTotal: 0,
   offeringsTotal: 0,

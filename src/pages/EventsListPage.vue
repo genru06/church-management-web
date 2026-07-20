@@ -6,6 +6,7 @@
         <span v-if="rows.length" class="entity-page__count">{{ rows.length }}</span>
       </div>
       <q-btn
+        v-if="auth.canDo('action.events.create')"
         dense
         unelevated
         no-caps
@@ -155,6 +156,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import EventFormDialog from "src/components/EventFormDialog.vue";
 import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
 import {
@@ -164,6 +166,7 @@ import {
 import { formatEventTime } from "src/utils/eventTime";
 
 const $q = useQuasar();
+const auth = useAuthStore();
 const router = useRouter();
 const rows = ref([]);
 const filter = ref("");

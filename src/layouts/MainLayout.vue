@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import { useAuthStore } from "src/stores/auth";
@@ -94,7 +94,7 @@ watch(
   }
 );
 
-const nav = computed(() => filterNavByTags(auth.tags));
+const nav = computed(() => filterNavByTags(auth.tags, auth.permissions));
 const primaryTag = computed(() => primaryTagLabel(auth.tags));
 
 const tagIcon = computed(() => {
@@ -104,6 +104,12 @@ const tagIcon = computed(() => {
   if (tag === "Life Coach") return "groups";
   if (tag === "Events Manager") return "event";
   return "badge";
+});
+
+onMounted(() => {
+  if (auth.isAuthenticated) {
+    auth.fetchMe().catch(() => {});
+  }
 });
 
 function onLogout() {

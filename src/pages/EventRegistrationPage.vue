@@ -99,7 +99,7 @@ function formatDate(value) {
 async function submitPayment() {
   paying.value = true;
   try {
-    const { data } = await api.post(`/events/${eventId}/participants/${participantId}/pay`, {
+    const { data } = await api.post(`/events/${eventId}/register/${participantId}/pay`, {
       amount: amount.value
     });
     participant.value = data;
@@ -115,12 +115,9 @@ async function submitPayment() {
 onMounted(async () => {
   loading.value = true;
   try {
-    const [eventRes, participantsRes] = await Promise.all([
-      api.get(`/events/${eventId}`),
-      api.get(`/events/${eventId}/participants`)
-    ]);
-    event.value = eventRes.data;
-    participant.value = participantsRes.data.find((p) => String(p.id) === String(participantId)) || null;
+    const { data } = await api.get(`/events/${eventId}/register/${participantId}`);
+    event.value = data.event;
+    participant.value = data.participant;
     amount.value = event.value.registrationFee || 0;
   } catch {
     $q.notify({ type: "negative", message: "Failed to load registration details." });

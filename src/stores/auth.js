@@ -1,6 +1,11 @@
 import { defineStore } from "pinia";
 import { api } from "src/boot/axios";
-import { canAccessPage, defaultRouteForTags } from "src/utils/permissions";
+import {
+  canAccessAction,
+  canAccessPage,
+  canAccessTab,
+  defaultRouteForTags
+} from "src/utils/permissions";
 
 const TOKEN_KEY = "lg_auth_token";
 const USER_KEY = "lg_auth_user";
@@ -14,6 +19,7 @@ export const useAuthStore = defineStore("auth", {
   getters: {
     isAuthenticated: (state) => Boolean(state.token && state.user),
     tags: (state) => state.user?.tags || [],
+    permissions: (state) => state.user?.permissions || [],
     churchId: (state) => state.user?.churchId ?? null,
     memberId: (state) => state.user?.memberId ?? null,
     fullName: (state) => state.user?.fullName || "",
@@ -58,11 +64,19 @@ export const useAuthStore = defineStore("auth", {
     },
 
     canAccess(page) {
-      return canAccessPage(this.tags, page);
+      return canAccessPage(this.tags, page, this.permissions);
+    },
+
+    canDo(actionKey) {
+      return canAccessAction(this.tags, actionKey, this.permissions);
+    },
+
+    canTab(tabKey) {
+      return canAccessTab(this.tags, tabKey, this.permissions);
     },
 
     defaultRoute() {
-      return defaultRouteForTags(this.tags);
+      return defaultRouteForTags(this.tags, this.permissions);
     }
   }
 });

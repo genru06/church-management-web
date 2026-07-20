@@ -33,7 +33,7 @@ export default route(function ({ store }) {
     }
 
     const page = to.meta?.page;
-    if (page && !canAccessPage(auth.tags, page)) {
+    if (page && !canAccessPage(auth.tags, page, auth.permissions)) {
       return next(auth.defaultRoute());
     }
 

@@ -97,7 +97,6 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { formatEventTime } from "src/utils/eventTime";
-import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -153,16 +152,12 @@ function onChurchChange() {
   }
 }
 
-async function loadOptions() {
-  const [churchesRes, lifegroupsRes] = await Promise.all([api.get("/churches"), api.get("/lifegroups")]);
-  churchOptions.value = sortChurchesMainFirst(
-    churchesRes.data.map((church) => ({
-      label: getChurchDisplayName(church),
-      value: church.id
-    })),
-    (church) => church.label
-  );
-  lifegroupOptions.value = lifegroupsRes.data.map((group) => ({
+function applySignupOptions(data) {
+  churchOptions.value = (data.churches || []).map((church) => ({
+    label: church.name,
+    value: church.id
+  }));
+  lifegroupOptions.value = (data.lifegroups || []).map((group) => ({
     label: group.name,
     value: group.id,
     churchId: group.churchId
@@ -175,7 +170,7 @@ async function loadSignupInfo() {
   try {
     const { data } = await api.get(`/events/${eventId}/signup`);
     signupInfo.value = data;
-    await loadOptions();
+    applySignupOptions(data);
   } catch (err) {
     signupInfo.value = null;
     const message = err?.response?.data?.message || "Failed to load registration page.";

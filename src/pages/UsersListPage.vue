@@ -6,6 +6,7 @@
         <span v-if="rows.length" class="entity-page__count">{{ rows.length }}</span>
       </div>
       <q-btn
+        v-if="auth.canDo('action.users.create')"
         dense
         unelevated
         no-caps
@@ -90,7 +91,7 @@
 
         <template #body-cell-actions="props">
           <q-td :props="props" class="entity-table__actions">
-            <q-btn flat dense round size="sm" color="grey-7" icon="edit" @click="openEditDialog(props.row)">
+            <q-btn flat dense round size="sm" color="grey-7" icon="edit" :disable="!auth.canDo('action.users.edit')" @click="openEditDialog(props.row)">
               <q-tooltip>Edit</q-tooltip>
             </q-btn>
             <q-btn
@@ -100,7 +101,7 @@
               size="sm"
               color="grey-7"
               icon="delete_outline"
-              :disable="props.row.id === auth.user?.id"
+              :disable="props.row.id === auth.user?.id || !auth.canDo('action.users.delete')"
               @click="confirmDelete(props.row)"
             >
               <q-tooltip>Delete</q-tooltip>

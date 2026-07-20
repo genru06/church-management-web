@@ -23,6 +23,7 @@ import EventSignupQrPage from "src/pages/EventSignupQrPage.vue";
 import OperationsPage from "src/pages/OperationsPage.vue";
 import UsersListPage from "src/pages/UsersListPage.vue";
 import TagsPage from "src/pages/TagsPage.vue";
+import AclPage from "src/pages/AclPage.vue";
 
 const routes = [
   {
@@ -81,7 +82,8 @@ const routes = [
       { path: "events/:id/scan", component: EventScanPage, props: true, meta: { page: "events" } },
       { path: "operations", component: OperationsPage, meta: { page: "operations" } },
       { path: "users", component: UsersListPage, meta: { page: "users" } },
-      { path: "tags", component: TagsPage, meta: { page: "tags" } }
+      { path: "tags", component: TagsPage, meta: { page: "tags" } },
+      { path: "acl", component: AclPage, meta: { page: "acl" } }
     ]
   },
   { path: "/:catchAll(.*)*", redirect: "/dashboard" }

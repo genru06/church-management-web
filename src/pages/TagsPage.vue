@@ -7,7 +7,7 @@
       </div>
     </header>
 
-    <section class="entity-page__panel q-pa-md q-mb-md">
+    <section v-if="auth.canDo('action.tags.create')" class="entity-page__panel q-pa-md q-mb-md">
       <q-form class="row q-col-gutter-sm items-start" @submit.prevent="addTag">
         <div class="col-12 col-sm">
           <q-input
@@ -75,7 +75,16 @@
 
         <template #body-cell-actions="props">
           <q-td :props="props" class="entity-table__actions">
-            <q-btn flat dense round size="sm" color="grey-7" icon="delete_outline" @click="confirmDelete(props.row)">
+            <q-btn
+              v-if="auth.canDo('action.tags.delete')"
+              flat
+              dense
+              round
+              size="sm"
+              color="grey-7"
+              icon="delete_outline"
+              @click="confirmDelete(props.row)"
+            >
               <q-tooltip>Delete</q-tooltip>
             </q-btn>
           </q-td>
@@ -96,8 +105,10 @@
 import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 
 const $q = useQuasar();
+const auth = useAuthStore();
 
 const rows = ref([]);
 const loading = ref(false);

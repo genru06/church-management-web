@@ -22,9 +22,10 @@ export default boot(({ app, router }) => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
+        const isPublicRoute = router.currentRoute.value.matched.some((record) => record.meta?.public === true);
         const auth = useAuthStore();
         auth.clearSession();
-        if (router.currentRoute.value.path !== "/login") {
+        if (!isPublicRoute && router.currentRoute.value.path !== "/login") {
           router.push("/login");
         }
       }

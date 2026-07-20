@@ -6,6 +6,7 @@
         <span v-if="rows.length" class="entity-page__count">{{ rows.length }}</span>
       </div>
       <q-btn
+        v-if="auth.canDo('action.churches.create')"
         dense
         unelevated
         no-caps
@@ -134,10 +135,12 @@
 import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import ChurchFormDialog from "src/components/ChurchFormDialog.vue";
 import ChurchDetailsDialog from "src/components/ChurchDetailsDialog.vue";
 import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
 
+const auth = useAuthStore();
 const $q = useQuasar();
 const rows = ref([]);
 const filter = ref("");

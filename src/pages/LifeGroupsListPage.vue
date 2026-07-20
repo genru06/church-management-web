@@ -6,6 +6,7 @@
         <span v-if="rows.length" class="entity-page__count">{{ rows.length }}</span>
       </div>
       <q-btn
+        v-if="auth.canDo('action.lifegroups.create')"
         dense
         unelevated
         no-caps
@@ -104,9 +105,11 @@
 import { onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import LifeGroupFormDialog from "src/components/LifeGroupFormDialog.vue";
 import LifeGroupDetailsDialog from "src/components/LifeGroupDetailsDialog.vue";
 
+const auth = useAuthStore();
 const $q = useQuasar();
 const rows = ref([]);
 const filter = ref("");

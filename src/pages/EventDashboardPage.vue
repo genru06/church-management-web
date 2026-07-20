@@ -7,6 +7,7 @@
       </div>
       <div class="entity-page__actions">
         <q-btn
+          v-if="auth.canDo('action.events.scan')"
           dense
           unelevated
           no-caps
@@ -16,6 +17,7 @@
           @click="router.push(`/events/${eventId}/scan`)"
         />
         <q-btn
+          v-if="auth.canDo('action.events.attendance')"
           dense
           outline
           no-caps
@@ -34,7 +36,16 @@
           label="Registration QR"
           @click="registrationQrDialogOpen = true"
         />
-        <q-btn dense outline no-caps color="grey-8" icon="edit" label="Edit event" @click="editDialogOpen = true" />
+        <q-btn
+          v-if="auth.canDo('action.events.edit')"
+          dense
+          outline
+          no-caps
+          color="grey-8"
+          icon="edit"
+          label="Edit event"
+          @click="editDialogOpen = true"
+        />
       </div>
     </header>
 
@@ -261,7 +272,16 @@
               :disable="!dashboard.participants.length"
               @click="openParticipantsView('church')"
             />
-            <q-btn dense unelevated no-caps color="primary" icon="person_add" label="Add participant" @click="openParticipantDialog" />
+            <q-btn
+              v-if="auth.canDo('action.events.manage_participants')"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="person_add"
+              label="Add participant"
+              @click="openParticipantDialog"
+            />
           </div>
         </div>
         <q-table
@@ -529,6 +549,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { useAuthStore } from "src/stores/auth";
 import EventFormDialog from "src/components/EventFormDialog.vue";
 import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
@@ -551,6 +572,7 @@ const props = defineProps({
 });
 
 const $q = useQuasar();
+const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const eventId = props.id || route.params.id;
