@@ -19,7 +19,8 @@ export default route(function ({ store }) {
 
   Router.beforeEach((to, _from, next) => {
     const auth = useAuthStore(store);
-    const isPublic = to.meta?.public === true;
+    // Check matched records — nested public routes may not expose meta on `to.meta` alone
+    const isPublic = to.matched.some((record) => record.meta?.public === true);
 
     if (isPublic) {
       if (to.path === "/login" && auth.isAuthenticated) {

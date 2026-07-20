@@ -30,19 +30,33 @@ const routes = [
     path: "/login",
     component: PublicLayout,
     meta: { public: true },
-    children: [{ path: "", component: LoginPage }]
+    children: [{ path: "", component: LoginPage, meta: { public: true } }]
   },
   {
     path: "/events/:id/signup",
     component: PublicLayout,
     meta: { public: true },
-    children: [{ path: "", component: EventSignupPage, props: (route) => ({ id: route.params.id }) }]
+    children: [
+      {
+        path: "",
+        component: EventSignupPage,
+        meta: { public: true },
+        props: (route) => ({ id: route.params.id })
+      }
+    ]
   },
   {
     path: "/events/:id/signup-qr",
     component: PublicLayout,
     meta: { public: true },
-    children: [{ path: "", component: EventSignupQrPage, props: (route) => ({ id: route.params.id }) }]
+    children: [
+      {
+        path: "",
+        component: EventSignupQrPage,
+        meta: { public: true },
+        props: (route) => ({ id: route.params.id })
+      }
+    ]
   },
   {
     path: "/events/:id/register/:participantId",
@@ -52,6 +66,7 @@ const routes = [
       {
         path: "",
         component: EventRegistrationPage,
+        meta: { public: true },
         props: (route) => ({ id: route.params.id, participantId: route.params.participantId })
       }
     ]
