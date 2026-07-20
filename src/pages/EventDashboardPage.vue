@@ -409,6 +409,20 @@
             :loading="churchesLoading"
           />
 
+          <AppSelect
+            v-if="templateScope === 'church' && templateChurchId"
+            v-model="templateLifeGroupId"
+            :options="templateLifeGroupOptions"
+            label="Lifegroup (optional)"
+            dense
+            outlined
+            emit-value
+            map-options
+            clearable
+            class="event-participant-template-dialog__lifegroup-select"
+            :loading="lifeGroupsLoading"
+          />
+
           <p v-if="templateScope === 'general'" class="event-participant-template-dialog__hint">
             This template includes the event identifier. Existing members are matched by name and linked
             to the event. Names not found are added as event-only participants, not as members. Lifegroup
@@ -417,8 +431,9 @@
           <p v-else class="event-participant-template-dialog__hint">
             The template includes hidden event and church identifiers. Existing members are matched by
             name and linked to the event. Names not found are created as members under the selected
-            church, then added as participants. An optional Lifegroup column links each member to that
-            group under the selected church only; if it does not exist there, it is created.
+            church, then added as participants. Optionally select a lifegroup to auto-link every imported
+            member to that group. You can still fill the Lifegroup column per row to override or assign a
+            different group.
           </p>
         </q-card-section>
 
@@ -476,7 +491,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
@@ -520,8 +535,11 @@ const uploadInputRef = ref(null);
 const templateDialogOpen = ref(false);
 const templateScope = ref("general");
 const templateChurchId = ref(null);
+const templateLifeGroupId = ref(null);
 const allChurchOptions = ref([]);
+const templateLifeGroupOptions = ref([]);
 const churchesLoading = ref(false);
+const lifeGroupsLoading = ref(false);
 const pledgeDialogOpen = ref(false);
 const pledgeMode = ref("create");
 const pledgeSaving = ref(false);
@@ -633,9 +651,43 @@ async function loadChurches() {
   }
 }
 
+async function loadTemplateLifeGroups(churchId) {
+  templateLifeGroupOptions.value = [];
+  if (!churchId) return;
+
+  lifeGroupsLoading.value = true;
+  try {
+    const { data } = await api.get(`/churches/${churchId}/lifegroups`);
+    templateLifeGroupOptions.value = (data || []).map((group) => ({
+      label: group.name,
+      value: Number(group.id)
+    }));
+  } catch {
+    templateLifeGroupOptions.value = [];
+    $q.notify({ type: "negative", message: "Failed to load lifegroups for this church." });
+  } finally {
+    lifeGroupsLoading.value = false;
+  }
+}
+
+watch(templateChurchId, (churchId) => {
+  templateLifeGroupId.value = null;
+  loadTemplateLifeGroups(churchId);
+});
+
+watch(templateScope, (scope) => {
+  if (scope !== "church") {
+    templateChurchId.value = null;
+    templateLifeGroupId.value = null;
+    templateLifeGroupOptions.value = [];
+  }
+});
+
 function openTemplateDialog() {
   templateScope.value = "general";
   templateChurchId.value = null;
+  templateLifeGroupId.value = null;
+  templateLifeGroupOptions.value = [];
   templateDialogOpen.value = true;
   if (!allChurchOptions.value.length) {
     loadChurches();
@@ -650,6 +702,9 @@ function downloadTemplate() {
   if (templateScope.value === "church" && !templateChurchId.value) return;
 
   const selectedChurch = allChurchOptions.value.find((church) => church.value === templateChurchId.value);
+  const selectedLifeGroup = templateLifeGroupOptions.value.find(
+    (group) => group.value === templateLifeGroupId.value
+  );
 
   downloadEventParticipantBulkTemplate(
     templateScope.value === "church"
@@ -657,7 +712,9 @@ function downloadTemplate() {
           eventId: Number(eventId),
           eventName: dashboard.value.event?.name || null,
           churchId: templateChurchId.value,
-          churchName: selectedChurch?.label || null
+          churchName: selectedChurch?.label || null,
+          lifeGroupId: templateLifeGroupId.value || null,
+          lifeGroupName: selectedLifeGroup?.label || null
         }
       : {
           eventId: Number(eventId),
@@ -665,10 +722,13 @@ function downloadTemplate() {
         }
   );
 
-  const message =
-    templateScope.value === "church"
-      ? `Church participant template downloaded${selectedChurch ? ` for ${selectedChurch.label}` : ""}.`
-      : "General participant import template downloaded.";
+  let message = "General participant import template downloaded.";
+  if (templateScope.value === "church") {
+    message = `Church participant template downloaded${selectedChurch ? ` for ${selectedChurch.label}` : ""}.`;
+    if (selectedLifeGroup) {
+      message = `Church participant template downloaded for ${selectedChurch?.label || "church"} · ${selectedLifeGroup.label}.`;
+    }
+  }
 
   $q.notify({ type: "info", message });
   closeTemplateDialog();
@@ -716,9 +776,10 @@ async function onUploadSelected(event) {
       });
     } else {
       const churchNote = payload.churchId ? " and new members were assigned to the template church" : "";
+      const lifeGroupNote = payload.lifeGroupId ? " and linked to the selected lifegroup" : "";
       $q.notify({
         type: "positive",
-        message: `${data.created} participant(s) imported successfully${churchNote}.`
+        message: `${data.created} participant(s) imported successfully${churchNote}${lifeGroupNote}.`
       });
     }
   } catch (err) {
@@ -938,7 +999,8 @@ onMounted(loadDashboard);
   padding: 16px;
 }
 
-.event-participant-template-dialog__church-select {
+.event-participant-template-dialog__church-select,
+.event-participant-template-dialog__lifegroup-select {
   margin-top: 4px;
 }
 

@@ -3,6 +3,7 @@ import {
   EVENT_PARTICIPANT_BULK_CHURCH_ID_KEY,
   EVENT_PARTICIPANT_BULK_COLUMNS,
   EVENT_PARTICIPANT_BULK_EVENT_ID_KEY,
+  EVENT_PARTICIPANT_BULK_LIFEGROUP_ID_KEY,
   EVENT_PARTICIPANT_BULK_SIGNATURE_KEY,
   EVENT_PARTICIPANT_BULK_SHEET_NAME,
   EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE,
@@ -21,20 +22,26 @@ function slugify(value) {
     .replace(/^-|-$/g, "");
 }
 
-function buildTemplateFilename({ eventId, eventName, churchId, churchName }) {
+function buildTemplateFilename({ eventId, eventName, churchId, churchName, lifeGroupId, lifeGroupName }) {
   const eventSlug = slugify(eventName) || `event-${eventId}`;
   if (!churchId) {
     return `event-participant-import-${eventId}-${eventSlug}.xlsx`;
   }
   const churchSlug = slugify(churchName) || `church-${churchId}`;
-  return `event-participant-import-${eventId}-${eventSlug}-church-${churchId}-${churchSlug}.xlsx`;
+  if (!lifeGroupId) {
+    return `event-participant-import-${eventId}-${eventSlug}-church-${churchId}-${churchSlug}.xlsx`;
+  }
+  const lifeGroupSlug = slugify(lifeGroupName) || `lifegroup-${lifeGroupId}`;
+  return `event-participant-import-${eventId}-${eventSlug}-church-${churchId}-${churchSlug}-lg-${lifeGroupId}-${lifeGroupSlug}.xlsx`;
 }
 
 export function downloadEventParticipantBulkTemplate({
   eventId,
   eventName = null,
   churchId = null,
-  churchName = null
+  churchName = null,
+  lifeGroupId = null,
+  lifeGroupName = null
 } = {}) {
   if (!eventId) {
     throw new Error("An event identifier is required to download the participant import template.");
@@ -45,18 +52,19 @@ export function downloadEventParticipantBulkTemplate({
     [EVENT_PARTICIPANT_BULK_SIGNATURE_KEY, EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE],
     [EVENT_PARTICIPANT_BULK_EVENT_ID_KEY, String(eventId)],
     [EVENT_PARTICIPANT_BULK_CHURCH_ID_KEY, churchId ? String(churchId) : ""],
+    [EVENT_PARTICIPANT_BULK_LIFEGROUP_ID_KEY, lifeGroupId ? String(lifeGroupId) : ""],
     headers
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-  worksheet["!rows"] = [{ hidden: true }, { hidden: true }, { hidden: true }];
+  worksheet["!rows"] = [{ hidden: true }, { hidden: true }, { hidden: true }, { hidden: true }];
   worksheet["!cols"] = headers.map((header) => ({ wch: Math.max(header.length + 2, 14) }));
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, EVENT_PARTICIPANT_BULK_SHEET_NAME);
   XLSX.writeFile(
     workbook,
-    buildTemplateFilename({ eventId, eventName, churchId, churchName })
+    buildTemplateFilename({ eventId, eventName, churchId, churchName, lifeGroupId, lifeGroupName })
   );
 }
 
@@ -111,11 +119,24 @@ function resolveTemplateLayout(sheet) {
     throw new Error("This template contains an invalid church identifier.");
   }
 
+  let lifeGroupId = null;
+  let dataStartRowIndex = 4;
+
+  const lifeGroupMeta = readMetadataRow(sheet, 3);
+  if (lifeGroupMeta.key === EVENT_PARTICIPANT_BULK_LIFEGROUP_ID_KEY) {
+    lifeGroupId = lifeGroupMeta.value ? Number(lifeGroupMeta.value) : null;
+    if (lifeGroupMeta.value && (!lifeGroupId || Number.isNaN(lifeGroupId))) {
+      throw new Error("This template contains an invalid lifegroup identifier.");
+    }
+    dataStartRowIndex = 5;
+  }
+
   return {
     signature: signatureMeta.value,
     eventId,
     churchId,
-    dataStartRowIndex: 4
+    lifeGroupId,
+    dataStartRowIndex
   };
 }
 
@@ -167,6 +188,7 @@ export async function parseEventParticipantBulkUpload(file) {
     signature: layout.signature,
     eventId: layout.eventId,
     churchId: layout.churchId,
+    lifeGroupId: layout.lifeGroupId,
     participants
   };
 }
