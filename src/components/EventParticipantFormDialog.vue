@@ -132,7 +132,7 @@ import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -188,10 +188,13 @@ async function loadChurches() {
   churchesLoading.value = true;
   try {
     const { data } = await api.get("/churches");
-    churchOptions.value = data.map((church) => ({
-      label: getChurchDisplayName(church),
-      value: Number(church.id)
-    }));
+    churchOptions.value = sortChurchesMainFirst(
+      data.map((church) => ({
+        label: getChurchDisplayName(church),
+        value: Number(church.id)
+      })),
+      (church) => church.label
+    );
   } finally {
     churchesLoading.value = false;
   }

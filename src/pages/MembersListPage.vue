@@ -250,7 +250,7 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import { downloadMemberBulkTemplate, parseMemberBulkUpload } from "src/utils/memberBulkExcel";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const $q = useQuasar();
@@ -353,10 +353,13 @@ async function loadChurches() {
   churchesLoading.value = true;
   try {
     const { data } = await api.get("/churches");
-    allChurchOptions.value = data.map((church) => ({
-      label: getChurchDisplayName(church),
-      value: Number(church.id)
-    }));
+    allChurchOptions.value = sortChurchesMainFirst(
+      data.map((church) => ({
+        label: getChurchDisplayName(church),
+        value: Number(church.id)
+      })),
+      (church) => church.label
+    );
   } finally {
     churchesLoading.value = false;
   }

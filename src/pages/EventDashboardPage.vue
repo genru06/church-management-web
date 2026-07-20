@@ -539,7 +539,7 @@ import {
   downloadEventParticipantBulkTemplate,
   parseEventParticipantBulkUpload
 } from "src/utils/eventParticipantBulkExcel";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import {
   getEventSignupUrl,
   isRegistrationOpen
@@ -710,10 +710,13 @@ async function loadChurches() {
   churchesLoading.value = true;
   try {
     const { data } = await api.get("/churches");
-    allChurchOptions.value = data.map((church) => ({
-      label: getChurchDisplayName(church),
-      value: Number(church.id)
-    }));
+    allChurchOptions.value = sortChurchesMainFirst(
+      data.map((church) => ({
+        label: getChurchDisplayName(church),
+        value: Number(church.id)
+      })),
+      (church) => church.label
+    );
   } finally {
     churchesLoading.value = false;
   }

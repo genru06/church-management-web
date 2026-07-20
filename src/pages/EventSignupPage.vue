@@ -97,7 +97,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { formatEventTime } from "src/utils/eventTime";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -155,10 +155,13 @@ function onChurchChange() {
 
 async function loadOptions() {
   const [churchesRes, lifegroupsRes] = await Promise.all([api.get("/churches"), api.get("/lifegroups")]);
-  churchOptions.value = churchesRes.data.map((church) => ({
-    label: getChurchDisplayName(church),
-    value: church.id
-  }));
+  churchOptions.value = sortChurchesMainFirst(
+    churchesRes.data.map((church) => ({
+      label: getChurchDisplayName(church),
+      value: church.id
+    })),
+    (church) => church.label
+  );
   lifegroupOptions.value = lifegroupsRes.data.map((group) => ({
     label: group.name,
     value: group.id,

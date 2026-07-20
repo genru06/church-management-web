@@ -86,7 +86,7 @@ import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
 import { DEFAULT_CITY_ID } from "../mocks/data";
 import { applyDefaultCity, ensureDefaultCityOption, toCityOption } from "src/utils/defaultCity";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -158,10 +158,13 @@ function submitForm() {
 
 async function loadChurches() {
   const { data } = await api.get("/churches");
-  allChurchOptions.value = data.map((church) => ({
-    label: getChurchDisplayName(church),
-    value: Number(church.id)
-  }));
+  allChurchOptions.value = sortChurchesMainFirst(
+    data.map((church) => ({
+      label: getChurchDisplayName(church),
+      value: Number(church.id)
+    })),
+    (church) => church.label
+  );
 }
 
 async function loadTags() {
@@ -188,7 +191,10 @@ function ensureChurchOption(churchId, churchName) {
   if (!id) return;
   const exists = allChurchOptions.value.some((opt) => opt.value === id);
   if (!exists) {
-    allChurchOptions.value = [{ label: churchName || `Church #${id}`, value: id }, ...allChurchOptions.value];
+    allChurchOptions.value = sortChurchesMainFirst(
+      [{ label: churchName || `Church #${id}`, value: id }, ...allChurchOptions.value],
+      (church) => church.label
+    );
   }
 }
 

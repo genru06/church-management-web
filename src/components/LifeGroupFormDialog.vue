@@ -89,7 +89,7 @@
 import { ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
-import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -133,10 +133,13 @@ async function loadOptions() {
     label: `${m.lastName}, ${m.firstName}`,
     value: m.id
   }));
-  allChurchOptions.value = churchesRes.data.map((c) => ({
-    label: getChurchDisplayName(c),
-    value: c.id
-  }));
+  allChurchOptions.value = sortChurchesMainFirst(
+    churchesRes.data.map((c) => ({
+      label: getChurchDisplayName(c),
+      value: c.id
+    })),
+    (church) => church.label
+  );
 }
 
 async function loadLifeGroup() {

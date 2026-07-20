@@ -71,6 +71,7 @@ import { computed, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
+import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -96,7 +97,10 @@ const form = ref({
 });
 
 const churchOptions = computed(() =>
-  props.churches.map((c) => ({ label: c.name, value: c.id }))
+  sortChurchesMainFirst(
+    props.churches.map((c) => ({ label: getChurchDisplayName(c), value: c.id })),
+    (church) => church.label
+  )
 );
 
 watch(

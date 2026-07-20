@@ -136,6 +136,7 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import ChurchFormDialog from "src/components/ChurchFormDialog.vue";
 import ChurchDetailsDialog from "src/components/ChurchDetailsDialog.vue";
+import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
 
 const $q = useQuasar();
 const rows = ref([]);
@@ -155,8 +156,24 @@ const pagination = ref({
 });
 
 const columns = [
-  { name: "name", label: "Name", field: "name", align: "left", sortable: true },
-  { name: "shortName", label: "Short name", field: "shortName", align: "left", sortable: true },
+  {
+    name: "name",
+    label: "Name",
+    field: "name",
+    align: "left",
+    sortable: true,
+    sort: (a, b, rowA, rowB) =>
+      compareChurchNamesMainFirst(getChurchDisplayName(rowA), getChurchDisplayName(rowB))
+  },
+  {
+    name: "shortName",
+    label: "Short name",
+    field: "shortName",
+    align: "left",
+    sortable: true,
+    sort: (a, b, rowA, rowB) =>
+      compareChurchNamesMainFirst(getChurchDisplayName(rowA), getChurchDisplayName(rowB))
+  },
   { name: "address", label: "Address", field: "address", align: "left" },
   { name: "pastorName", label: "Pastor", field: "pastorName", align: "left", sortable: true },
   { name: "tags", label: "Tags", field: "tags", align: "left" },

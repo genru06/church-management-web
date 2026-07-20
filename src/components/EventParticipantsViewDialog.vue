@@ -131,6 +131,10 @@
                   <div class="q-ml-md participants-view-dialog__stat-text">
                     <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
                     <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
+                    <div v-if="group.kidsCount" class="participants-view-dialog__stat-breakdown">
+                      <span>{{ group.adultCount }} adults</span>
+                      <span>{{ group.kidsCount }} kids</span>
+                    </div>
                   </div>
                 </q-card-section>
               </q-card>
@@ -143,6 +147,9 @@
                 <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
                 <p class="participants-view-dialog__detail-meta">
                   {{ selectedGroup.participants.length }} participant(s)
+                  <span v-if="selectedGroup.kidsCount">
+                    · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
+                  </span>
                   <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
                 </p>
               </div>
@@ -219,6 +226,7 @@ import { useQuasar } from "quasar";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
+import { compareChurchNamesMainFirst } from "src/utils/churchDisplay";
 
 const CARD_COLORS = ["primary", "secondary", "accent", "positive", "orange", "purple"];
 
@@ -336,7 +344,8 @@ const churchGroups = computed(() => {
         churchId: participant.churchId,
         churchName,
         participants: [],
-        attendedCount: 0
+        attendedCount: 0,
+        kidsCount: 0
       });
     }
 
@@ -351,18 +360,22 @@ const churchGroups = computed(() => {
     if (participant.attendedAt) {
       group.attendedCount += 1;
     }
+    if (participant.isKid) {
+      group.kidsCount += 1;
+    }
   });
 
   return Array.from(map.values())
     .map((group) => ({
       ...group,
+      adultCount: group.participants.length - group.kidsCount,
       participants: group.participants.sort((a, b) => {
         const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
         if (last !== 0) return last;
         return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
       })
     }))
-    .sort((a, b) => a.churchName.localeCompare(b.churchName));
+    .sort((a, b) => compareChurchNamesMainFirst(a.churchName, b.churchName));
 });
 
 const selectedGroup = computed(() => {
@@ -533,6 +546,17 @@ watch(viewMode, (mode) => {
   font-weight: 600;
   color: #1a1a2e;
   line-height: 1.2;
+}
+
+.participants-view-dialog__stat-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #5f6b7a;
+  line-height: 1.25;
 }
 
 .participants-view-dialog__detail {
