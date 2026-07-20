@@ -52,6 +52,10 @@
           >
             <span class="event-stat-card__label">Participants</span>
             <span class="event-stat-card__value">{{ dashboard.stats.participantCount }}</span>
+            <span v-if="dashboard.stats.kidsCount" class="event-stat-card__breakdown">
+              <span>{{ dashboard.stats.adultCount }} adults</span>
+              <span>{{ dashboard.stats.kidsCount }} kids</span>
+            </span>
             <span class="event-stat-card__hint">View list</span>
           </button>
         </div>
@@ -266,9 +270,28 @@
           row-key="id"
           flat
           dense
-          :pagination="{ rowsPerPage: 10 }"
+          :filter="participantFilter"
+          :filter-method="filterParticipants"
+          v-model:pagination="participantPagination"
           class="entity-table"
         >
+          <template #top>
+            <div class="entity-table__toolbar">
+              <q-input
+                v-model="participantFilter"
+                dense
+                borderless
+                clearable
+                placeholder="Search participants…"
+                class="entity-table__search"
+              >
+                <template #prepend>
+                  <q-icon name="search" size="18px" color="grey-6" />
+                </template>
+              </q-input>
+            </div>
+          </template>
+
           <template #body-cell-churchName="props">
             <q-td :props="props">
               <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
@@ -307,6 +330,16 @@
                 <q-tooltip>Remove</q-tooltip>
               </q-btn>
             </q-td>
+          </template>
+
+          <template #no-data>
+            <div class="full-width row flex-center q-pa-md text-grey-6">
+              {{
+                participantFilter
+                  ? "No participants match your search."
+                  : "No participants yet."
+              }}
+            </div>
           </template>
         </q-table>
       </section>
@@ -431,9 +464,9 @@
           <p v-else class="event-participant-template-dialog__hint">
             The template includes hidden event and church identifiers. Existing members are matched by
             name and linked to the event. Names not found are created as members under the selected
-            church, then added as participants. Optionally select a lifegroup to auto-link every imported
-            member to that group. You can still fill the Lifegroup column per row to override or assign a
-            different group.
+            church, then added as participants. Optionally select a lifegroup to pre-fill the template
+            with that group's members (Kids are excluded) and auto-link everyone on import. You can
+            still fill the Lifegroup column per row to override or assign a different group.
           </p>
         </q-card-section>
 
@@ -446,7 +479,8 @@
             no-caps
             color="primary"
             label="Download"
-            :disable="templateScope === 'church' && !templateChurchId"
+            :loading="templateDownloading"
+            :disable="templateDownloading || (templateScope === 'church' && !templateChurchId)"
             @click="downloadTemplate"
           />
         </q-card-actions>
@@ -540,6 +574,7 @@ const allChurchOptions = ref([]);
 const templateLifeGroupOptions = ref([]);
 const churchesLoading = ref(false);
 const lifeGroupsLoading = ref(false);
+const templateDownloading = ref(false);
 const pledgeDialogOpen = ref(false);
 const pledgeMode = ref("create");
 const pledgeSaving = ref(false);
@@ -547,6 +582,14 @@ const editingPledgeId = ref(null);
 const pledgeFormRef = ref(null);
 
 const requiredRule = (val) => !!val || "Required";
+
+const participantPagination = ref({
+  page: 1,
+  rowsPerPage: 10,
+  sortBy: "lastName",
+  descending: false
+});
+const participantFilter = ref("");
 
 const templateScopeOptions = [
   { label: "General", value: "general" },
@@ -638,6 +681,31 @@ function openParticipantsView(mode = "all") {
   participantsViewDialogOpen.value = true;
 }
 
+function filterParticipants(rows, terms) {
+  const needle = String(terms || "")
+    .trim()
+    .toLowerCase();
+  if (!needle) return rows;
+
+  return rows.filter((row) => {
+    const haystack = [
+      row.firstName,
+      row.lastName,
+      row.fullName,
+      row.churchName,
+      row.lifegroupName,
+      row.email,
+      row.phone,
+      ...(Array.isArray(row.tags) ? row.tags : [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(needle);
+  });
+}
+
 async function loadChurches() {
   churchesLoading.value = true;
   try {
@@ -698,7 +766,65 @@ function closeTemplateDialog() {
   templateDialogOpen.value = false;
 }
 
-function downloadTemplate() {
+function hasKidsTag(tags = []) {
+  return (tags || []).some((tag) => String(tag || "").trim().toLowerCase() === "kids");
+}
+
+function buildLifeGroupParticipantRows(group) {
+  const rows = [];
+  const seen = new Set();
+
+  const pushMember = ({ firstName, lastName, phone, tags }) => {
+    const first = String(firstName || "").trim();
+    const last = String(lastName || "").trim();
+    if (!first || !last) return;
+
+    const key = `${first.toLowerCase()}|${last.toLowerCase()}`;
+    if (seen.has(key)) return;
+    if (hasKidsTag(tags)) return;
+
+    seen.add(key);
+    rows.push({
+      firstName: first,
+      lastName: last,
+      tag: "",
+      phone: phone || "",
+      lifeGroup: ""
+    });
+  };
+
+  if (group?.coachId) {
+    pushMember({
+      firstName: group.coachFirstName,
+      lastName: group.coachLastName,
+      phone: group.coachPhone,
+      tags: group.coachTags
+    });
+  }
+
+  (group?.members || []).forEach((member) => {
+    pushMember({
+      firstName: member.firstName,
+      lastName: member.lastName,
+      phone: member.phone,
+      tags: member.tags
+    });
+  });
+
+  return rows.sort((a, b) => {
+    const last = a.lastName.localeCompare(b.lastName, undefined, { sensitivity: "base" });
+    if (last !== 0) return last;
+    return a.firstName.localeCompare(b.firstName, undefined, { sensitivity: "base" });
+  });
+}
+
+async function loadLifeGroupParticipantRows(lifeGroupId) {
+  if (!lifeGroupId) return [];
+  const { data } = await api.get(`/lifegroups/${lifeGroupId}`);
+  return buildLifeGroupParticipantRows(data);
+}
+
+async function downloadTemplate() {
   if (templateScope.value === "church" && !templateChurchId.value) return;
 
   const selectedChurch = allChurchOptions.value.find((church) => church.value === templateChurchId.value);
@@ -706,32 +832,49 @@ function downloadTemplate() {
     (group) => group.value === templateLifeGroupId.value
   );
 
-  downloadEventParticipantBulkTemplate(
-    templateScope.value === "church"
-      ? {
-          eventId: Number(eventId),
-          eventName: dashboard.value.event?.name || null,
-          churchId: templateChurchId.value,
-          churchName: selectedChurch?.label || null,
-          lifeGroupId: templateLifeGroupId.value || null,
-          lifeGroupName: selectedLifeGroup?.label || null
-        }
-      : {
-          eventId: Number(eventId),
-          eventName: dashboard.value.event?.name || null
-        }
-  );
-
-  let message = "General participant import template downloaded.";
-  if (templateScope.value === "church") {
-    message = `Church participant template downloaded${selectedChurch ? ` for ${selectedChurch.label}` : ""}.`;
-    if (selectedLifeGroup) {
-      message = `Church participant template downloaded for ${selectedChurch?.label || "church"} · ${selectedLifeGroup.label}.`;
+  templateDownloading.value = true;
+  try {
+    let participants = [];
+    if (templateScope.value === "church" && templateLifeGroupId.value) {
+      participants = await loadLifeGroupParticipantRows(templateLifeGroupId.value);
     }
-  }
 
-  $q.notify({ type: "info", message });
-  closeTemplateDialog();
+    downloadEventParticipantBulkTemplate(
+      templateScope.value === "church"
+        ? {
+            eventId: Number(eventId),
+            eventName: dashboard.value.event?.name || null,
+            churchId: templateChurchId.value,
+            churchName: selectedChurch?.label || null,
+            lifeGroupId: templateLifeGroupId.value || null,
+            lifeGroupName: selectedLifeGroup?.label || null,
+            participants
+          }
+        : {
+            eventId: Number(eventId),
+            eventName: dashboard.value.event?.name || null
+          }
+    );
+
+    let message = "General participant import template downloaded.";
+    if (templateScope.value === "church") {
+      message = `Church participant template downloaded${selectedChurch ? ` for ${selectedChurch.label}` : ""}.`;
+      if (selectedLifeGroup) {
+        message = `Template downloaded for ${selectedChurch?.label || "church"} · ${selectedLifeGroup.label} (${participants.length} member${participants.length === 1 ? "" : "s"}, Kids excluded).`;
+      }
+    }
+
+    $q.notify({ type: "info", message });
+    closeTemplateDialog();
+  } catch (err) {
+    const message = err?.response?.data?.message || err?.message || "Failed to download template.";
+    $q.notify({
+      type: "negative",
+      message: Array.isArray(message) ? message[0] : message
+    });
+  } finally {
+    templateDownloading.value = false;
+  }
 }
 
 function openUploadPicker() {
@@ -925,6 +1068,17 @@ onMounted(loadDashboard);
   letter-spacing: 0.02em;
   color: #1976d2;
   margin-top: 2px;
+}
+
+.event-stat-card__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #5f6b7a;
+  line-height: 1.25;
 }
 
 .event-stat-card__label {

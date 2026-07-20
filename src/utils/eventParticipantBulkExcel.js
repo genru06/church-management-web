@@ -41,19 +41,24 @@ export function downloadEventParticipantBulkTemplate({
   churchId = null,
   churchName = null,
   lifeGroupId = null,
-  lifeGroupName = null
+  lifeGroupName = null,
+  participants = []
 } = {}) {
   if (!eventId) {
     throw new Error("An event identifier is required to download the participant import template.");
   }
 
   const headers = EVENT_PARTICIPANT_BULK_COLUMNS.map((col) => col.header);
+  const participantRows = (Array.isArray(participants) ? participants : []).map((participant) =>
+    EVENT_PARTICIPANT_BULK_COLUMNS.map((column) => normalizeCell(participant?.[column.key]))
+  );
   const sheetData = [
     [EVENT_PARTICIPANT_BULK_SIGNATURE_KEY, EVENT_PARTICIPANT_BULK_TEMPLATE_SIGNATURE],
     [EVENT_PARTICIPANT_BULK_EVENT_ID_KEY, String(eventId)],
     [EVENT_PARTICIPANT_BULK_CHURCH_ID_KEY, churchId ? String(churchId) : ""],
     [EVENT_PARTICIPANT_BULK_LIFEGROUP_ID_KEY, lifeGroupId ? String(lifeGroupId) : ""],
-    headers
+    headers,
+    ...participantRows
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(sheetData);

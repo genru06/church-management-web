@@ -48,9 +48,28 @@
             row-key="id"
             flat
             dense
-            :pagination="{ rowsPerPage: 25 }"
+            :filter="participantFilter"
+            :filter-method="filterParticipants"
+            :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
             class="participants-view-dialog__table entity-table entity-page__panel"
           >
+            <template #top>
+              <div class="entity-table__toolbar">
+                <q-input
+                  v-model="participantFilter"
+                  dense
+                  borderless
+                  clearable
+                  placeholder="Search participants…"
+                  class="entity-table__search"
+                >
+                  <template #prepend>
+                    <q-icon name="search" size="18px" color="grey-6" />
+                  </template>
+                </q-input>
+              </div>
+            </template>
+
             <template #body-cell-churchName="props">
               <q-td :props="props">
                 <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
@@ -79,6 +98,16 @@
                   :label="props.row.attendedAt ? 'Present' : 'Absent'"
                 />
               </q-td>
+            </template>
+
+            <template #no-data>
+              <div class="full-width row flex-center q-pa-md text-grey-6">
+                {{
+                  participantFilter
+                    ? "No participants match your search."
+                    : "No participants yet."
+                }}
+              </div>
             </template>
           </q-table>
         </template>
@@ -145,7 +174,7 @@
               row-key="id"
               flat
               dense
-              :pagination="{ rowsPerPage: 25 }"
+              :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
               class="participants-view-dialog__table entity-table"
             >
               <template #body-cell-lifegroupName="props">
@@ -209,6 +238,7 @@ const router = useRouter();
 const viewMode = ref("all");
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
+const participantFilter = ref("");
 
 const viewModeOptions = [
   { label: "All participants", value: "all" },
@@ -230,6 +260,33 @@ const sortedParticipants = computed(() =>
       return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
     })
 );
+
+function filterParticipants(rows, terms) {
+  const needle = String(terms || "")
+    .trim()
+    .toLowerCase();
+  if (!needle) return rows;
+
+  return rows.filter((row) => {
+    const haystack = [
+      row.firstName,
+      row.lastName,
+      row.fullName,
+      row.displayFirstName,
+      row.displayLastName,
+      row.churchName,
+      row.lifegroupName,
+      row.email,
+      row.phone,
+      ...(Array.isArray(row.tags) ? row.tags : [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(needle);
+  });
+}
 
 const allColumns = computed(() => {
   const columns = [
