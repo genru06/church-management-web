@@ -423,6 +423,7 @@
       :participants="dashboard.participants"
       :has-registration-fee="hasRegistrationFee"
       :initial-view="participantsViewInitialMode"
+      @linked="loadDashboard"
     />
 
     <q-dialog v-model="templateDialogOpen" persistent>

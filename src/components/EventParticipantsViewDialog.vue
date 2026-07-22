@@ -155,6 +155,18 @@
               </div>
               <div class="participants-view-dialog__detail-actions">
                 <q-btn
+                  v-if="canLinkSelectedGroup"
+                  dense
+                  outline
+                  no-caps
+                  color="secondary"
+                  icon="link"
+                  label="Link to members"
+                  :loading="linkingMembers"
+                  :disable="linkingMembers"
+                  @click="linkToMembers"
+                />
+                <q-btn
                   dense
                   outline
                   no-caps
@@ -223,6 +235,7 @@
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
+import { api } from "src/boot/axios";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
@@ -239,7 +252,7 @@ const props = defineProps({
   initialView: { type: String, default: "all" }
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "linked"]);
 
 const $q = useQuasar();
 const router = useRouter();
@@ -247,6 +260,7 @@ const viewMode = ref("all");
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
 const participantFilter = ref("");
+const linkingMembers = ref(false);
 
 const viewModeOptions = [
   { label: "All participants", value: "all" },
@@ -383,6 +397,13 @@ const selectedGroup = computed(() => {
   return churchGroups.value.find((group) => group.key === selectedKey.value) || null;
 });
 
+const unlinkedInSelectedGroup = computed(() => {
+  if (!selectedGroup.value) return [];
+  return selectedGroup.value.participants.filter((participant) => !participant.memberLinked && !participant.memberId);
+});
+
+const canLinkSelectedGroup = computed(() => unlinkedInSelectedGroup.value.length > 0);
+
 function cardColor(index) {
   return CARD_COLORS[index % CARD_COLORS.length];
 }
@@ -406,6 +427,52 @@ function exportChurch(group) {
 
 function printChurch(group) {
   router.push(getAttendancePrintUrl(props.eventId, { churchKey: group.key }));
+}
+
+async function linkToMembers() {
+  if (!props.eventId || !canLinkSelectedGroup.value || linkingMembers.value) return;
+
+  const participantIds = unlinkedInSelectedGroup.value.map((participant) => participant.id);
+  const count = participantIds.length;
+
+  linkingMembers.value = true;
+  try {
+    const { data } = await api.post(`/events/${props.eventId}/participants/link-members`, {
+      participantIds
+    });
+
+    const linked = Number(data?.linked) || 0;
+    const unmatched = Number(data?.unmatched) || 0;
+    const skipped = Number(data?.skipped) || 0;
+
+    if (linked > 0) {
+      $q.notify({
+        type: "positive",
+        message: `Linked ${linked} of ${count} participant(s) to existing members.`
+      });
+    } else {
+      $q.notify({
+        type: "warning",
+        message: "No matching members were found for the selected participants."
+      });
+    }
+
+    if (unmatched > 0 || skipped > 0) {
+      const parts = [];
+      if (unmatched > 0) parts.push(`${unmatched} unmatched`);
+      if (skipped > 0) parts.push(`${skipped} already registered as members`);
+      $q.notify({ type: "info", message: parts.join(" · ") });
+    }
+
+    emit("linked", data);
+  } catch (err) {
+    $q.notify({
+      type: "negative",
+      message: err?.response?.data?.message || err?.message || "Failed to link participants to members."
+    });
+  } finally {
+    linkingMembers.value = false;
+  }
 }
 
 async function loadQrCodes(participants) {
@@ -446,6 +513,24 @@ watch(viewMode, (mode) => {
     qrByParticipant.value = {};
   }
 });
+
+watch(
+  () => props.participants,
+  () => {
+    if (viewMode.value !== "church" || !selectedKey.value) return;
+    const group = churchGroups.value.find((item) => item.key === selectedKey.value);
+    if (group) {
+      loadQrCodes(group.participants);
+      return;
+    }
+    if (churchGroups.value.length) {
+      selectChurch(churchGroups.value[0]);
+    } else {
+      selectedKey.value = null;
+      qrByParticipant.value = {};
+    }
+  }
+);
 </script>
 
 <style scoped lang="scss">
