@@ -1,10 +1,44 @@
-export function getMembersPrintUrl({ tags } = {}) {
-  const base = "/members/print";
-  if (!tags?.length) return base;
+export const LIFEGROUP_FILTER_TAG = "lifegroup";
 
+export function isLifeGroupFilterTag(tag) {
+  return String(tag || "").trim().toLowerCase() === LIFEGROUP_FILTER_TAG;
+}
+
+export function hasLifeGroupFilterTag(tags = []) {
+  return (tags || []).some(isLifeGroupFilterTag);
+}
+
+export function tagsForMemberApi(tags = []) {
+  return (tags || []).filter((tag) => !isLifeGroupFilterTag(tag));
+}
+
+export function getMembersPrintUrl({ tags, lifeGroupId } = {}) {
   const params = new URLSearchParams();
-  tags.forEach((tag) => params.append("tag", tag));
-  return `${base}?${params.toString()}`;
+  (tags || []).forEach((tag) => params.append("tag", tag));
+  if (lifeGroupId != null && lifeGroupId !== "") {
+    params.set("lifeGroupId", String(lifeGroupId));
+  }
+  const query = params.toString();
+  return query ? `/members/print?${query}` : "/members/print";
+}
+
+function sortMembers(rows) {
+  return [...rows].sort((a, b) => {
+    const last = (a.lastName || "").localeCompare(b.lastName || "");
+    if (last !== 0) return last;
+    return (a.firstName || "").localeCompare(b.firstName || "");
+  });
+}
+
+export function groupMembersByLifeGroup(members, { lifeGroupName } = {}) {
+  const title = lifeGroupName || "LifeGroup";
+  return [
+    {
+      key: `lifegroup:${String(title).toLowerCase()}`,
+      tagName: title,
+      members: sortMembers(members)
+    }
+  ].filter((group) => group.members.length);
 }
 
 export function groupMembersByTag(members, { tagFilter = [], allTagNames = [] } = {}) {
@@ -42,13 +76,6 @@ export function groupMembersByTag(members, { tagFilter = [], allTagNames = [] } 
     });
     orderedTags.sort((a, b) => a.localeCompare(b));
   }
-
-  const sortMembers = (rows) =>
-    [...rows].sort((a, b) => {
-      const last = (a.lastName || "").localeCompare(b.lastName || "");
-      if (last !== 0) return last;
-      return (a.firstName || "").localeCompare(b.firstName || "");
-    });
 
   const groups = orderedTags.map((tagName) => {
     const key = tagName.toLowerCase();

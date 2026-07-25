@@ -44,7 +44,7 @@
           icon="print"
           label="Print list"
           class="members-page__secondary-btn"
-          :disable="!rows.length || loading"
+          :disable="!rows.length || loading || (lifeGroupFilterEnabled && !lifeGroupFilter)"
           @click="openPrintPage"
         />
         <q-btn
@@ -108,6 +108,24 @@
             >
               <template #prepend>
                 <q-icon name="sell" size="18px" color="grey-6" />
+              </template>
+            </AppSelect>
+            <AppSelect
+              v-if="lifeGroupFilterEnabled"
+              v-model="lifeGroupFilter"
+              :options="lifeGroupOptions"
+              dense
+              borderless
+              clearable
+              emit-value
+              map-options
+              placeholder="Filter by lifegroup"
+              class="members-table__lifegroup-select"
+              :loading="lifeGroupsLoading"
+              @update:model-value="onLifeGroupFilterChange"
+            >
+              <template #prepend>
+                <q-icon name="groups" size="18px" color="grey-6" />
               </template>
             </AppSelect>
           </div>
@@ -267,7 +285,11 @@ import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import { downloadMemberBulkTemplate, parseMemberBulkUpload } from "src/utils/memberBulkExcel";
 import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
-import { getMembersPrintUrl } from "src/utils/memberPrint";
+import {
+  getMembersPrintUrl,
+  hasLifeGroupFilterTag,
+  tagsForMemberApi
+} from "src/utils/memberPrint";
 
 const $q = useQuasar();
 const auth = useAuthStore();
@@ -276,6 +298,9 @@ const router = useRouter();
 const filter = ref("");
 const tagFilter = ref([]);
 const tagOptions = ref([]);
+const lifeGroupFilter = ref(null);
+const lifeGroupOptions = ref([]);
+const lifeGroupsLoading = ref(false);
 const rawRows = ref([]);
 const loading = ref(false);
 const uploading = ref(false);
@@ -352,7 +377,12 @@ function openCreateDialog() {
 }
 
 function openPrintPage() {
-  router.push(getMembersPrintUrl({ tags: tagFilter.value }));
+  router.push(
+    getMembersPrintUrl({
+      tags: tagFilter.value,
+      lifeGroupId: lifeGroupFilterEnabled.value ? lifeGroupFilter.value : null
+    })
+  );
 }
 
 function openEditDialog(row) {
@@ -510,11 +540,38 @@ async function loadTags() {
   }
 }
 
+async function loadLifeGroups() {
+  lifeGroupsLoading.value = true;
+  try {
+    const { data } = await api.get("/lifegroups");
+    lifeGroupOptions.value = (data || [])
+      .map((group) => ({
+        label: group.name,
+        value: Number(group.id)
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  } catch {
+    lifeGroupOptions.value = [];
+    $q.notify({ type: "negative", message: "Failed to load lifegroups." });
+  } finally {
+    lifeGroupsLoading.value = false;
+  }
+}
+
 async function loadMembers() {
   loading.value = true;
   try {
+    if (lifeGroupFilterEnabled.value && !lifeGroupFilter.value) {
+      rawRows.value = [];
+      return;
+    }
+
     const params = {};
-    if (tagFilter.value.length) params.tag = tagFilter.value;
+    const apiTags = tagsForMemberApi(tagFilter.value);
+    if (apiTags.length) params.tag = apiTags;
+    if (lifeGroupFilterEnabled.value && lifeGroupFilter.value) {
+      params.lifeGroupId = lifeGroupFilter.value;
+    }
     const { data } = await api.get("/members", {
       params,
       paramsSerializer: {
@@ -549,20 +606,66 @@ function normalizeRouteTags(queryTag) {
   return tags;
 }
 
-function syncTagFilterFromRoute() {
+function normalizeRouteLifeGroupId(queryValue) {
+  if (queryValue == null || queryValue === "") return null;
+  const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function buildMembersQuery({ tags = tagFilter.value, lifeGroupId = lifeGroupFilter.value } = {}) {
+  const query = {};
+  if (tags.length) query.tag = tags;
+  if (hasLifeGroupFilterTag(tags) && lifeGroupId) {
+    query.lifeGroupId = lifeGroupId;
+  }
+  return query;
+}
+
+function syncFiltersFromRoute() {
   tagFilter.value = normalizeRouteTags(route.query.tag);
+  lifeGroupFilter.value = hasLifeGroupFilterTag(tagFilter.value)
+    ? normalizeRouteLifeGroupId(route.query.lifeGroupId)
+    : null;
 }
 
 function onTagFilterChange(value) {
   const nextTags = Array.isArray(value) ? value.filter(Boolean) : [];
   tagFilter.value = nextTags;
-  const query = nextTags.length ? { tag: nextTags } : {};
-  router.replace({ path: "/members", query });
+  if (!hasLifeGroupFilterTag(nextTags)) {
+    lifeGroupFilter.value = null;
+  } else if (!lifeGroupOptions.value.length) {
+    loadLifeGroups();
+  }
+  router.replace({
+    path: "/members",
+    query: buildMembersQuery({ tags: nextTags, lifeGroupId: lifeGroupFilter.value })
+  });
 }
 
+function onLifeGroupFilterChange(value) {
+  lifeGroupFilter.value = value || null;
+  router.replace({
+    path: "/members",
+    query: buildMembersQuery({
+      tags: tagFilter.value,
+      lifeGroupId: lifeGroupFilter.value
+    })
+  });
+}
+
+const lifeGroupFilterEnabled = computed(() => hasLifeGroupFilterTag(tagFilter.value));
+
 const emptyMessage = computed(() => {
-  if (tagFilter.value.length) {
-    return tagFilter.value.length === 1
+  if (lifeGroupFilterEnabled.value && lifeGroupFilter.value) {
+    return "No members in this lifegroup.";
+  }
+  if (lifeGroupFilterEnabled.value && !lifeGroupFilter.value) {
+    return "Select a lifegroup to view its members.";
+  }
+  const apiTags = tagsForMemberApi(tagFilter.value);
+  if (apiTags.length) {
+    return apiTags.length === 1
       ? "No members with this tag."
       : "No members with these tags.";
   }
@@ -595,17 +698,28 @@ const columns = [
 ];
 
 onMounted(async () => {
-  syncTagFilterFromRoute();
-  await Promise.all([loadTags(), loadMembers()]);
+  syncFiltersFromRoute();
+  const loaders = [loadTags(), loadMembers()];
+  if (lifeGroupFilterEnabled.value) loaders.push(loadLifeGroups());
+  await Promise.all(loaders);
 });
 
 watch(
-  () => route.query.tag,
+  () => [route.query.tag, route.query.lifeGroupId],
   async () => {
-    syncTagFilterFromRoute();
+    syncFiltersFromRoute();
+    if (lifeGroupFilterEnabled.value && !lifeGroupOptions.value.length) {
+      await loadLifeGroups();
+    }
     await loadMembers();
   }
 );
+
+watch(lifeGroupFilterEnabled, (enabled) => {
+  if (enabled && !lifeGroupOptions.value.length) {
+    loadLifeGroups();
+  }
+});
 </script>
 
 <style scoped lang="scss">
@@ -799,6 +913,26 @@ watch(
   :deep(.q-chip) {
     margin: 1px 2px;
     font-size: 0.72rem;
+  }
+}
+
+.members-table__lifegroup-select {
+  min-width: 200px;
+  max-width: 320px;
+  flex: 1 1 200px;
+
+  :deep(.q-field__control) {
+    min-height: 30px;
+    padding: 2px 8px;
+    background: #f5f7fa;
+    border-radius: 6px;
+  }
+
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
+    font-size: 0.8rem;
+    padding: 0;
+    min-height: 24px;
   }
 }
 

@@ -10,7 +10,7 @@
         color="primary"
         icon="print"
         label="Print"
-        :disable="!tagGroups.length || loading"
+        :disable="!printGroups.length || loading"
         @click="printSheet"
       />
     </div>
@@ -22,12 +22,19 @@
     <article v-if="!loading" class="members-print-page__document">
       <header class="members-print-page__header">
         <h1 class="members-print-page__title">Member List</h1>
-        <p v-if="tagFilterLabel" class="members-print-page__filter">Tags: {{ tagFilterLabel }}</p>
-        <p class="members-print-page__count">{{ totalMembers }} member(s) · {{ tagGroups.length }} tag group(s)</p>
+        <p v-if="lifeGroupFilterLabel" class="members-print-page__filter">
+          LifeGroup: {{ lifeGroupFilterLabel }}
+        </p>
+        <p v-else-if="tagFilterLabel" class="members-print-page__filter">Tags: {{ tagFilterLabel }}</p>
+        <p class="members-print-page__count">
+          {{ totalMembers }} member(s)
+          <template v-if="isLifeGroupPrint"> · 1 lifegroup</template>
+          <template v-else> · {{ printGroups.length }} tag group(s)</template>
+        </p>
       </header>
 
       <section
-        v-for="group in tagGroups"
+        v-for="group in printGroups"
         :key="group.key"
         class="members-print-page__section"
       >
@@ -43,7 +50,7 @@
               <th>Last Name</th>
               <th>First Name</th>
               <th>Church</th>
-              <th>LifeGroup</th>
+              <th v-if="!isLifeGroupPrint">LifeGroup</th>
             </tr>
           </thead>
           <tbody>
@@ -59,13 +66,13 @@
               <td>{{ member.lastName || "—" }}</td>
               <td>{{ member.firstName || "—" }}</td>
               <td>{{ member.church || "—" }}</td>
-              <td>{{ member.lifeGroup || "—" }}</td>
+              <td v-if="!isLifeGroupPrint">{{ member.lifeGroup || "—" }}</td>
             </tr>
           </tbody>
         </table>
       </section>
 
-      <p v-if="!tagGroups.length" class="members-print-page__empty">No members to print.</p>
+      <p v-if="!printGroups.length" class="members-print-page__empty">No members to print.</p>
     </article>
   </q-page>
 </template>
@@ -76,7 +83,12 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { generateMemberQrDataUrl } from "src/utils/memberQr";
-import { groupMembersByTag } from "src/utils/memberPrint";
+import {
+  groupMembersByLifeGroup,
+  groupMembersByTag,
+  hasLifeGroupFilterTag,
+  tagsForMemberApi
+} from "src/utils/memberPrint";
 
 const $q = useQuasar();
 const route = useRoute();
@@ -85,6 +97,7 @@ const router = useRouter();
 const loading = ref(false);
 const members = ref([]);
 const allTagNames = ref([]);
+const lifeGroupName = ref("");
 const qrByMember = ref({});
 
 function normalizeRouteTags(queryTag) {
@@ -110,26 +123,51 @@ function normalizeRouteTags(queryTag) {
   return tags;
 }
 
-const tagFilter = computed(() => normalizeRouteTags(route.query.tag));
+function normalizeRouteLifeGroupId(queryValue) {
+  if (queryValue == null || queryValue === "") return null;
+  const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
 
-const tagGroups = computed(() =>
-  groupMembersByTag(members.value, {
-    tagFilter: tagFilter.value,
-    allTagNames: allTagNames.value
-  })
+const tagFilter = computed(() => normalizeRouteTags(route.query.tag));
+const lifeGroupId = computed(() => normalizeRouteLifeGroupId(route.query.lifeGroupId));
+const isLifeGroupPrint = computed(
+  () => hasLifeGroupFilterTag(tagFilter.value) && Boolean(lifeGroupId.value)
 );
 
+const printGroups = computed(() => {
+  if (isLifeGroupPrint.value) {
+    return groupMembersByLifeGroup(members.value, {
+      lifeGroupName: lifeGroupName.value
+    });
+  }
+
+  return groupMembersByTag(members.value, {
+    tagFilter: tagsForMemberApi(tagFilter.value),
+    allTagNames: allTagNames.value
+  });
+});
+
 const totalMembers = computed(() =>
-  tagGroups.value.reduce((sum, group) => sum + group.members.length, 0)
+  printGroups.value.reduce((sum, group) => sum + group.members.length, 0)
 );
 
 const tagFilterLabel = computed(() => {
-  if (!tagFilter.value.length) return "";
-  return tagFilter.value.join(", ");
+  const tags = tagsForMemberApi(tagFilter.value);
+  if (!tags.length) return "";
+  return tags.join(", ");
+});
+
+const lifeGroupFilterLabel = computed(() => {
+  if (!isLifeGroupPrint.value) return "";
+  return lifeGroupName.value || "Selected lifegroup";
 });
 
 function goBack() {
-  const query = tagFilter.value.length ? { tag: tagFilter.value } : {};
+  const query = {};
+  if (tagFilter.value.length) query.tag = tagFilter.value;
+  if (isLifeGroupPrint.value) query.lifeGroupId = lifeGroupId.value;
   router.push({ path: "/members", query });
 }
 
@@ -164,22 +202,40 @@ async function loadQrCodes(rows) {
 async function loadPrintSheet() {
   loading.value = true;
   try {
-    const params = {};
-    if (tagFilter.value.length) params.tag = tagFilter.value;
+    if (hasLifeGroupFilterTag(tagFilter.value) && !lifeGroupId.value) {
+      $q.notify({ type: "warning", message: "Select a lifegroup before printing." });
+      router.push({
+        path: "/members",
+        query: tagFilter.value.length ? { tag: tagFilter.value } : {}
+      });
+      return;
+    }
 
-    const [tagsRes, membersRes] = await Promise.all([
+    const params = {};
+    const apiTags = tagsForMemberApi(tagFilter.value);
+    if (apiTags.length) params.tag = apiTags;
+    if (lifeGroupId.value) params.lifeGroupId = lifeGroupId.value;
+
+    const requests = [
       api.get("/tags"),
       api.get("/members", {
         params,
         paramsSerializer: { indexes: null }
       })
-    ]);
+    ];
+
+    if (lifeGroupId.value) {
+      requests.push(api.get(`/lifegroups/${lifeGroupId.value}`));
+    }
+
+    const [tagsRes, membersRes, lifeGroupRes] = await Promise.all(requests);
 
     allTagNames.value = tagsRes.data.map((tag) => tag.name);
+    lifeGroupName.value = lifeGroupRes?.data?.name || "";
     const withTokens = await ensureMemberQrTokens(membersRes.data);
     members.value = withTokens;
 
-    const printableMembers = tagGroups.value.flatMap((group) => group.members);
+    const printableMembers = printGroups.value.flatMap((group) => group.members);
     const uniqueMembers = [...new Map(printableMembers.map((member) => [member.id, member])).values()];
     await loadQrCodes(uniqueMembers);
   } catch {
