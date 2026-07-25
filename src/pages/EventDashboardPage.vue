@@ -364,7 +364,7 @@
               color="primary"
               icon="church"
               label="By church"
-              :disable="!dashboard.participants.length"
+              :disable="!dashboard.participants.length && !(dashboard.reservations || []).length"
               @click="openParticipantsView('church')"
             />
             <q-btn
@@ -516,6 +516,7 @@
       :event-id="eventId"
       :event="dashboard.event"
       :participants="dashboard.participants"
+      :reservations="dashboard.reservations || []"
       :has-registration-fee="hasRegistrationFee"
       :initial-view="participantsViewInitialMode"
       @linked="loadDashboard"

@@ -36,13 +36,18 @@
       <q-separator />
 
       <q-card-section class="participants-view-dialog__body">
-        <div v-if="!participants.length" class="participants-view-dialog__empty">
+        <div v-if="!participants.length && !reservations.length" class="participants-view-dialog__empty">
           <q-icon name="groups" size="32px" color="grey-5" />
           <p>No participants yet.</p>
         </div>
 
         <template v-else-if="viewMode === 'all'">
+          <div v-if="!participants.length" class="participants-view-dialog__empty">
+            <q-icon name="groups" size="32px" color="grey-5" />
+            <p>No participants yet.</p>
+          </div>
           <q-table
+            v-else
             :rows="sortedParticipants"
             :columns="allColumns"
             row-key="id"
@@ -113,118 +118,183 @@
         </template>
 
         <template v-else>
-          <div class="row q-col-gutter-md participants-view-dialog__cards">
-            <div
-              v-for="(group, index) in churchGroups"
-              :key="group.key"
-              class="col-12 col-sm-6 col-md-4 col-lg-3"
-            >
-              <q-card
-                flat
-                bordered
-                class="participants-view-dialog__stat-card"
-                :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
-                @click="selectChurch(group)"
-              >
-                <q-card-section class="row items-center no-wrap">
-                  <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
-                  <div class="q-ml-md participants-view-dialog__stat-text">
-                    <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
-                    <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
-                    <div v-if="group.kidsCount" class="participants-view-dialog__stat-breakdown">
-                      <span>{{ group.adultCount }} adults</span>
-                      <span>{{ group.kidsCount }} kids</span>
-                    </div>
-                  </div>
-                </q-card-section>
-              </q-card>
-            </div>
+          <div v-if="!churchGroups.length" class="participants-view-dialog__empty">
+            <q-icon name="church" size="32px" color="grey-5" />
+            <p>No churches to show yet.</p>
           </div>
 
-          <section v-if="selectedGroup" class="participants-view-dialog__detail entity-page__panel">
-            <div class="participants-view-dialog__detail-header">
-              <div>
-                <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
-                <p class="participants-view-dialog__detail-meta">
-                  {{ selectedGroup.participants.length }} participant(s)
-                  <span v-if="selectedGroup.kidsCount">
-                    · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
-                  </span>
-                  <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
-                </p>
-              </div>
-              <div class="participants-view-dialog__detail-actions">
-                <q-btn
-                  v-if="canLinkSelectedGroup"
-                  dense
-                  outline
-                  no-caps
-                  color="secondary"
-                  icon="link"
-                  label="Link to members"
-                  :loading="linkingMembers"
-                  :disable="linkingMembers"
-                  @click="linkToMembers"
-                />
-                <q-btn
-                  dense
-                  outline
-                  no-caps
-                  color="primary"
-                  icon="print"
-                  label="Print sheet"
-                  @click="printChurch(selectedGroup)"
-                />
-                <q-btn
-                  dense
-                  unelevated
-                  no-caps
-                  color="primary"
-                  icon="download"
-                  label="Export Excel"
-                  @click="exportChurch(selectedGroup)"
-                />
+          <div v-else>
+            <div class="row q-col-gutter-md participants-view-dialog__cards">
+              <div
+                v-for="(group, index) in churchGroups"
+                :key="group.key"
+                class="col-12 col-sm-6 col-md-4 col-lg-3"
+              >
+                <q-card
+                  flat
+                  bordered
+                  class="participants-view-dialog__stat-card"
+                  :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
+                  @click="selectChurch(group)"
+                >
+                  <q-card-section class="row items-center no-wrap">
+                    <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
+                    <div class="q-ml-md participants-view-dialog__stat-text">
+                      <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
+                      <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
+                      <div v-if="group.kidsCount" class="participants-view-dialog__stat-breakdown">
+                        <span>{{ group.adultCount }} adults</span>
+                        <span>{{ group.kidsCount }} kids</span>
+                      </div>
+                      <div v-if="group.reservedTotal" class="participants-view-dialog__stat-reserved">
+                        Reserved {{ group.reservedTotal }}
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
               </div>
             </div>
 
-            <q-table
-              :rows="selectedGroup.participants"
-              :columns="churchColumns"
-              row-key="id"
-              flat
-              dense
-              :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
-              class="participants-view-dialog__table entity-table"
-            >
-              <template #body-cell-lifegroupName="props">
-                <q-td :props="props">
-                  <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
-                </q-td>
-              </template>
-
-              <template #body-cell-attendedAt="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="props.row.attendedAt ? 'positive' : 'grey'"
-                    :label="props.row.attendedAt ? 'Present' : 'Absent'"
+            <section v-if="selectedGroup" class="participants-view-dialog__detail entity-page__panel">
+              <div class="participants-view-dialog__detail-header">
+                <div>
+                  <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
+                  <p class="participants-view-dialog__detail-meta">
+                    {{ selectedGroup.participants.length }} participant(s)
+                    <span v-if="selectedGroup.kidsCount">
+                      · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
+                    </span>
+                    <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
+                    <span v-if="selectedGroup.reservedTotal">
+                      · {{ selectedGroup.reservedTotal }} reserved
+                    </span>
+                  </p>
+                </div>
+                <div class="participants-view-dialog__detail-actions">
+                  <q-btn
+                    v-if="canLinkSelectedGroup"
+                    dense
+                    outline
+                    no-caps
+                    color="secondary"
+                    icon="link"
+                    label="Link to members"
+                    :loading="linkingMembers"
+                    :disable="linkingMembers"
+                    @click="linkToMembers"
                   />
-                </q-td>
-              </template>
+                  <q-btn
+                    dense
+                    outline
+                    no-caps
+                    color="primary"
+                    icon="print"
+                    label="Print sheet"
+                    :disable="!selectedGroup.participants.length"
+                    @click="printChurch(selectedGroup)"
+                  />
+                  <q-btn
+                    dense
+                    unelevated
+                    no-caps
+                    color="primary"
+                    icon="download"
+                    label="Export Excel"
+                    :disable="!selectedGroup.participants.length"
+                    @click="exportChurch(selectedGroup)"
+                  />
+                </div>
+              </div>
 
-              <template #body-cell-qrCode="props">
-                <q-td :props="props">
-                  <div class="participants-view-dialog__qr">
-                    <img
-                      v-if="qrByParticipant[props.row.id]"
-                      :src="qrByParticipant[props.row.id]"
-                      :alt="`QR for ${props.row.fullName}`"
-                    />
-                    <q-spinner v-else size="20px" color="primary" />
+              <div class="participants-view-dialog__reservations">
+                <div class="participants-view-dialog__reservations-header">
+                  <h4 class="participants-view-dialog__reservations-title">Reservations</h4>
+                  <span
+                    v-if="selectedGroupReservations.length"
+                    class="participants-view-dialog__reservations-total"
+                  >
+                    Total {{ selectedGroup.reservedTotal }}
+                  </span>
+                </div>
+
+                <div
+                  v-if="selectedGroupReservations.length"
+                  class="participants-view-dialog__reservation-list"
+                >
+                  <div
+                    v-for="reservation in selectedGroupReservations"
+                    :key="reservation.id"
+                    class="participants-view-dialog__reservation-row"
+                  >
+                    <div class="participants-view-dialog__reservation-main">
+                      <span class="participants-view-dialog__reservation-type">
+                        {{ reservation.participantType }}
+                      </span>
+                      <span
+                        v-if="reservation.label && reservation.label !== selectedGroup.churchName"
+                        class="participants-view-dialog__reservation-label"
+                      >
+                        {{ reservation.label }}
+                      </span>
+                      <span v-if="reservation.notes" class="participants-view-dialog__reservation-notes">
+                        {{ reservation.notes }}
+                      </span>
+                    </div>
+                    <strong class="participants-view-dialog__reservation-count">
+                      {{ reservation.reservedCount }}
+                    </strong>
                   </div>
-                </q-td>
-              </template>
-            </q-table>
-          </section>
+                </div>
+                <p v-else class="participants-view-dialog__reservations-empty">
+                  No reservations for this church yet.
+                </p>
+              </div>
+
+              <q-table
+                :rows="selectedGroup.participants"
+                :columns="churchColumns"
+                row-key="id"
+                flat
+                dense
+                :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
+                class="participants-view-dialog__table entity-table"
+              >
+                <template #body-cell-lifegroupName="props">
+                  <q-td :props="props">
+                    <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+                  </q-td>
+                </template>
+
+                <template #body-cell-attendedAt="props">
+                  <q-td :props="props">
+                    <q-badge
+                      :color="props.row.attendedAt ? 'positive' : 'grey'"
+                      :label="props.row.attendedAt ? 'Present' : 'Absent'"
+                    />
+                  </q-td>
+                </template>
+
+                <template #body-cell-qrCode="props">
+                  <q-td :props="props">
+                    <div class="participants-view-dialog__qr">
+                      <img
+                        v-if="qrByParticipant[props.row.id]"
+                        :src="qrByParticipant[props.row.id]"
+                        :alt="`QR for ${props.row.fullName}`"
+                      />
+                      <q-spinner v-else size="20px" color="primary" />
+                    </div>
+                  </q-td>
+                </template>
+
+                <template #no-data>
+                  <div class="full-width row flex-center q-pa-md text-grey-6">
+                    No registered participants for this church yet.
+                  </div>
+                </template>
+              </q-table>
+            </section>
+          </div>
         </template>
       </q-card-section>
     </q-card>
@@ -248,6 +318,7 @@ const props = defineProps({
   eventId: { type: [String, Number], default: null },
   event: { type: Object, default: null },
   participants: { type: Array, default: () => [] },
+  reservations: { type: Array, default: () => [] },
   hasRegistrationFee: { type: Boolean, default: false },
   initialView: { type: String, default: "all" }
 });
@@ -348,22 +419,26 @@ const churchColumns = [
 const churchGroups = computed(() => {
   const map = new Map();
 
-  props.participants.forEach((participant) => {
-    const key = participant.churchId ?? "unassigned";
-    const churchName = participant.churchName || "Unassigned";
-
+  function ensureGroup(key, churchId, churchName) {
     if (!map.has(key)) {
       map.set(key, {
         key,
-        churchId: participant.churchId,
+        churchId: churchId ?? null,
         churchName,
         participants: [],
         attendedCount: 0,
-        kidsCount: 0
+        kidsCount: 0,
+        reservations: []
       });
     }
+    return map.get(key);
+  }
 
-    const group = map.get(key);
+  props.participants.forEach((participant) => {
+    const key = participant.churchId ?? "unassigned";
+    const churchName = participant.churchName || "Unassigned";
+    const group = ensureGroup(key, participant.churchId, churchName);
+
     group.participants.push({
       ...participant,
       displayLastName: participant.lastName || participant.fullName || "—",
@@ -379,16 +454,42 @@ const churchGroups = computed(() => {
     }
   });
 
+  props.reservations.forEach((reservation) => {
+    const key = reservation.churchId ?? "unassigned";
+    const churchName = reservation.churchName || reservation.label || "Unassigned";
+    const group = ensureGroup(key, reservation.churchId, churchName);
+    if (!group.churchName || group.churchName === "Unassigned") {
+      group.churchName = churchName;
+    }
+    group.reservations.push(reservation);
+  });
+
   return Array.from(map.values())
-    .map((group) => ({
-      ...group,
-      adultCount: group.participants.length - group.kidsCount,
-      participants: group.participants.sort((a, b) => {
-        const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
-        if (last !== 0) return last;
-        return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
-      })
-    }))
+    .map((group) => {
+      const reservedTotal = group.reservations.reduce(
+        (sum, row) => sum + Number(row.reservedCount || 0),
+        0
+      );
+      return {
+        ...group,
+        reservedTotal,
+        adultCount: group.participants.length - group.kidsCount,
+        reservations: [...group.reservations].sort((a, b) => {
+          const type = String(a.participantType || "").localeCompare(
+            String(b.participantType || ""),
+            undefined,
+            { sensitivity: "base" }
+          );
+          if (type !== 0) return type;
+          return Number(b.reservedCount || 0) - Number(a.reservedCount || 0);
+        }),
+        participants: group.participants.sort((a, b) => {
+          const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
+          if (last !== 0) return last;
+          return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
+        })
+      };
+    })
     .sort((a, b) => compareChurchNamesMainFirst(a.churchName, b.churchName));
 });
 
@@ -396,6 +497,8 @@ const selectedGroup = computed(() => {
   if (!selectedKey.value) return null;
   return churchGroups.value.find((group) => group.key === selectedKey.value) || null;
 });
+
+const selectedGroupReservations = computed(() => selectedGroup.value?.reservations || []);
 
 const unlinkedInSelectedGroup = computed(() => {
   if (!selectedGroup.value) return [];
@@ -644,6 +747,13 @@ watch(
   line-height: 1.25;
 }
 
+.participants-view-dialog__stat-reserved {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1976d2;
+}
+
 .participants-view-dialog__detail {
   overflow: hidden;
 }
@@ -675,6 +785,81 @@ watch(
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+.participants-view-dialog__reservations {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef1f6;
+  background: #fff;
+}
+
+.participants-view-dialog__reservations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.participants-view-dialog__reservations-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.participants-view-dialog__reservations-total {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.participants-view-dialog__reservation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.participants-view-dialog__reservation-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #eef1f6;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.participants-view-dialog__reservation-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.participants-view-dialog__reservation-type {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.participants-view-dialog__reservation-label,
+.participants-view-dialog__reservation-notes {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.participants-view-dialog__reservation-count {
+  font-size: 0.95rem;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+.participants-view-dialog__reservations-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9ca3af;
 }
 
 .participants-view-dialog__qr img {
