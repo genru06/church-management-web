@@ -128,6 +128,7 @@
                   dense
                   outlined
                   hide-bottom-space
+                  hint="Also updated automatically from event reservations"
                 />
               </div>
               <div class="col-12 col-sm-4">
