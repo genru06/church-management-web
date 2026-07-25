@@ -62,17 +62,24 @@
             @click="openParticipantsView('all')"
           >
             <span class="event-stat-card__label">Participants</span>
-            <span class="event-stat-card__value">{{ dashboard.stats.participantCount }}</span>
+            <span class="event-stat-card__value">{{ participantsWithReservedTotal }}</span>
             <span
               v-if="dashboard.stats.kidsCount || reservationTotal"
               class="event-stat-card__breakdown"
             >
+              <span v-if="reservationTotal">{{ dashboard.stats.participantCount }} registered</span>
               <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.adultCount }} adults</span>
               <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.kidsCount }} kids</span>
               <span v-if="reservationTotal">{{ reservationTotal }} reserved</span>
             </span>
             <span class="event-stat-card__hint">View list</span>
           </button>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
+          <div class="event-stat-card">
+            <span class="event-stat-card__label">Expected</span>
+            <span class="event-stat-card__value">{{ dashboard.event.expectedParticipants || "—" }}</span>
+          </div>
         </div>
         <div class="col-6 col-sm-4 col-md-2">
           <div class="event-stat-card">
@@ -769,6 +776,10 @@ const reservationForm = ref({
 
 const reservationTotal = computed(() =>
   (dashboard.value.reservations || []).reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
+);
+
+const participantsWithReservedTotal = computed(
+  () => Number(dashboard.value.stats?.participantCount || 0) + reservationTotal.value
 );
 
 const reservationColumns = [
