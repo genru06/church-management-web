@@ -63,19 +63,16 @@
           >
             <span class="event-stat-card__label">Participants</span>
             <span class="event-stat-card__value">{{ dashboard.stats.participantCount }}</span>
-            <span v-if="dashboard.stats.kidsCount" class="event-stat-card__breakdown">
-              <span>{{ dashboard.stats.adultCount }} adults</span>
-              <span>{{ dashboard.stats.kidsCount }} kids</span>
+            <span
+              v-if="dashboard.stats.kidsCount || reservationTotal"
+              class="event-stat-card__breakdown"
+            >
+              <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.adultCount }} adults</span>
+              <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.kidsCount }} kids</span>
+              <span v-if="reservationTotal">{{ reservationTotal }} reserved</span>
             </span>
             <span class="event-stat-card__hint">View list</span>
           </button>
-        </div>
-        <div class="col-6 col-sm-4 col-md-2">
-          <div class="event-stat-card">
-            <span class="event-stat-card__label">Expected</span>
-            <span class="event-stat-card__value">{{ dashboard.stats.expectedParticipants || "—" }}</span>
-            <span v-if="reservationTotal" class="event-stat-card__hint">From reservations</span>
-          </div>
         </div>
         <div class="col-6 col-sm-4 col-md-2">
           <div class="event-stat-card">
