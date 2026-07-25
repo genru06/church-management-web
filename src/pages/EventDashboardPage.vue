@@ -240,13 +240,6 @@
             <span v-if="reservationTotal" class="event-dashboard__reservation-total">
               Total reserved: {{ reservationTotal }}
             </span>
-            <span
-              v-for="item in reservationTypeBreakdown"
-              :key="item.type"
-              class="event-dashboard__reservation-type-chip"
-            >
-              {{ item.type }}: {{ item.count }}
-            </span>
             <q-btn
               v-if="auth.canDo('action.events.edit')"
               dense
@@ -260,7 +253,7 @@
           </div>
         </div>
         <p class="event-dashboard__section-note">
-          Enter expected headcounts by church or group for a quick glimpse of attendance before people register.
+          Reserve expected guests who are not members of any registered church (e.g. Friends, Relatives).
         </p>
         <q-table
           :rows="dashboard.reservations || []"
@@ -271,24 +264,9 @@
           :pagination="{ rowsPerPage: 10 }"
           class="entity-table"
         >
-          <template #body-cell-churchName="props">
-            <q-td :props="props">
-              <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
-            </q-td>
-          </template>
-          <template #body-cell-participantType="props">
-            <q-td :props="props">
-              <q-badge color="blue-grey-2" text-color="blue-grey-9" :label="props.row.participantType" />
-            </q-td>
-          </template>
           <template #body-cell-reservedCount="props">
             <q-td :props="props">
               <strong>{{ props.row.reservedCount }}</strong>
-            </q-td>
-          </template>
-          <template #body-cell-notes="props">
-            <q-td :props="props">
-              <span class="entity-table__muted">{{ props.row.notes || "—" }}</span>
             </q-td>
           </template>
           <template #body-cell-actions="props">
@@ -321,7 +299,7 @@
           </template>
           <template #no-data>
             <div class="full-width row flex-center q-pa-md text-grey-6">
-              No reservations yet. Add church or group headcounts to estimate expected participants.
+              No reservations yet. Use Add reservation to enter guest group headcounts.
             </div>
           </template>
         </q-table>
@@ -646,6 +624,9 @@
             <h2 class="entity-dialog__title">
               {{ reservationMode === "create" ? "Add reservation" : "Edit reservation" }}
             </h2>
+            <p class="entity-dialog__subtitle">
+              For guests who are not members of any registered church
+            </p>
           </div>
           <q-btn flat round dense icon="close" color="grey-7" @click="reservationDialogOpen = false" />
         </header>
@@ -654,70 +635,26 @@
           <q-form ref="reservationFormRef" class="entity-dialog__form">
             <div class="row q-col-gutter-sm">
               <div class="col-12">
-                <AppSelect
-                  v-model="reservationForm.churchId"
-                  :options="allChurchOptions"
-                  label="Church"
-                  clearable
-                  dense
-                  outlined
-                  hide-bottom-space
-                  :loading="churchesLoading"
-                />
-              </div>
-              <div class="col-12 col-sm-8">
                 <q-input
                   v-model="reservationForm.label"
-                  label="Label *"
+                  label="Group name *"
                   dense
                   outlined
                   hide-bottom-space
                   :rules="[requiredRule]"
-                  hint="Defaults to church name, or enter a custom group"
+                  hint="e.g. Friends, Relatives, Visitors"
                 />
               </div>
-              <div class="col-12 col-sm-4">
+              <div class="col-12">
                 <q-input
                   v-model.number="reservationForm.reservedCount"
                   type="number"
                   min="0"
-                  label="Reserved *"
+                  label="Number of people *"
                   dense
                   outlined
                   hide-bottom-space
                   :rules="[reservedCountRule]"
-                />
-              </div>
-              <div class="col-12">
-                <q-select
-                  v-model="reservationForm.participantType"
-                  :options="participantTypeOptions"
-                  label="Participant type *"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  use-input
-                  fill-input
-                  hide-selected
-                  input-debounce="0"
-                  new-value-mode="add"
-                  emit-value
-                  map-options
-                  :rules="[requiredRule]"
-                  hint="Type a name (e.g. Friends, Relatives) or pick an existing one"
-                  @filter="filterParticipantTypes"
-                  @new-value="addParticipantTypeOption"
-                />
-              </div>
-              <div class="col-12">
-                <q-input
-                  v-model="reservationForm.notes"
-                  type="textarea"
-                  autogrow
-                  label="Notes"
-                  dense
-                  outlined
-                  hide-bottom-space
                 />
               </div>
             </div>
@@ -829,42 +766,16 @@ const pledgeForm = ref({
 });
 
 const reservationForm = ref({
-  churchId: null,
   label: "",
-  participantType: "",
-  reservedCount: null,
-  notes: ""
+  reservedCount: null
 });
-
-const DEFAULT_PARTICIPANT_TYPES = ["Members", "Friends", "Relatives", "Guests", "Kids"];
-
-const participantTypeOptions = ref([...DEFAULT_PARTICIPANT_TYPES]);
 
 const reservationTotal = computed(() =>
   (dashboard.value.reservations || []).reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
 );
 
-const reservationTypeBreakdown = computed(() => {
-  const totals = new Map();
-  for (const row of dashboard.value.reservations || []) {
-    const type = row.participantType?.trim() || "Participants";
-    totals.set(type, (totals.get(type) || 0) + Number(row.reservedCount || 0));
-  }
-  return [...totals.entries()]
-    .map(([type, count]) => ({ type, count }))
-    .sort((a, b) => a.type.localeCompare(b.type, undefined, { sensitivity: "base" }));
-});
-
 const reservationColumns = [
-  { name: "label", label: "Label", field: "label", align: "left", sortable: true },
-  { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
-  {
-    name: "participantType",
-    label: "Type",
-    field: "participantType",
-    align: "left",
-    sortable: true
-  },
+  { name: "label", label: "Group name", field: "label", align: "left", sortable: true },
   {
     name: "reservedCount",
     label: "Reserved",
@@ -872,7 +783,6 @@ const reservationColumns = [
     align: "right",
     sortable: true
   },
-  { name: "notes", label: "Notes", field: "notes", align: "left" },
   { name: "actions", label: "", field: "actions", align: "right" }
 ];
 
@@ -1018,21 +928,6 @@ watch(templateChurchId, (churchId) => {
   templateLifeGroupId.value = null;
   loadTemplateLifeGroups(churchId);
 });
-
-watch(
-  () => reservationForm.value.churchId,
-  (churchId, previousChurchId) => {
-    if (!churchId || churchId === previousChurchId) return;
-    const selected = allChurchOptions.value.find((church) => church.value === churchId);
-    if (!selected?.label) return;
-
-    const previousChurch = allChurchOptions.value.find((church) => church.value === previousChurchId);
-    const currentLabel = reservationForm.value.label?.trim() || "";
-    if (!currentLabel || (previousChurch && currentLabel === previousChurch.label)) {
-      reservationForm.value.label = selected.label;
-    }
-  }
-);
 
 watch(templateScope, (scope) => {
   if (scope !== "church") {
@@ -1303,17 +1198,7 @@ function removePledge(row) {
 function openReservationDialog() {
   reservationMode.value = "create";
   editingReservationId.value = null;
-  reservationForm.value = {
-    churchId: null,
-    label: "",
-    participantType: "",
-    reservedCount: null,
-    notes: ""
-  };
-  refreshParticipantTypeOptions();
-  if (!allChurchOptions.value.length) {
-    loadChurches();
-  }
+  reservationForm.value = { label: "", reservedCount: null };
   reservationDialogOpen.value = true;
 }
 
@@ -1321,69 +1206,10 @@ function editReservation(row) {
   reservationMode.value = "edit";
   editingReservationId.value = row.id;
   reservationForm.value = {
-    churchId: row.churchId || null,
     label: row.label || "",
-    participantType: row.participantType || "",
-    reservedCount: row.reservedCount,
-    notes: row.notes || ""
+    reservedCount: row.reservedCount
   };
-  refreshParticipantTypeOptions(row.participantType);
-  if (!allChurchOptions.value.length) {
-    loadChurches();
-  }
   reservationDialogOpen.value = true;
-}
-
-function refreshParticipantTypeOptions(extraType = "") {
-  const used = (dashboard.value.reservations || [])
-    .map((row) => row.participantType?.trim())
-    .filter(Boolean);
-  const merged = [...DEFAULT_PARTICIPANT_TYPES, ...used, extraType].filter(Boolean);
-  const seen = new Set();
-  participantTypeOptions.value = merged.filter((type) => {
-    const key = type.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function filterParticipantTypes(val, update) {
-  update(() => {
-    const needle = String(val || "")
-      .trim()
-      .toLowerCase();
-    const base = (() => {
-      const used = (dashboard.value.reservations || [])
-        .map((row) => row.participantType?.trim())
-        .filter(Boolean);
-      const merged = [...DEFAULT_PARTICIPANT_TYPES, ...used];
-      const seen = new Set();
-      return merged.filter((type) => {
-        const key = type.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    })();
-    if (!needle) {
-      participantTypeOptions.value = base;
-      return;
-    }
-    participantTypeOptions.value = base.filter((type) => type.toLowerCase().includes(needle));
-  });
-}
-
-function addParticipantTypeOption(val, done) {
-  const type = String(val || "").trim();
-  if (!type) return;
-  const exists = participantTypeOptions.value.some(
-    (option) => String(option).toLowerCase() === type.toLowerCase()
-  );
-  if (!exists) {
-    participantTypeOptions.value = [...participantTypeOptions.value, type];
-  }
-  done(type);
 }
 
 async function saveReservation() {
@@ -1393,11 +1219,8 @@ async function saveReservation() {
   reservationSaving.value = true;
   try {
     const payload = {
-      churchId: reservationForm.value.churchId || null,
       label: reservationForm.value.label,
-      participantType: reservationForm.value.participantType,
-      reservedCount: reservationForm.value.reservedCount,
-      notes: reservationForm.value.notes || null
+      reservedCount: reservationForm.value.reservedCount
     };
     if (reservationMode.value === "create") {
       await api.post(`/events/${eventId}/reservations`, payload);
@@ -1540,15 +1363,6 @@ onMounted(loadDashboard);
   font-size: 0.82rem;
   font-weight: 600;
   color: #374151;
-}
-
-.event-dashboard__reservation-type-chip {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #4b5563;
-  background: #f3f4f6;
-  border-radius: 6px;
-  padding: 2px 8px;
 }
 
 .event-dashboard__section-note {

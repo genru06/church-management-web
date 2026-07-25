@@ -118,12 +118,55 @@
         </template>
 
         <template v-else>
-          <div v-if="!churchGroups.length" class="participants-view-dialog__empty">
+          <div v-if="!churchGroups.length && !guestReservations.length" class="participants-view-dialog__empty">
             <q-icon name="church" size="32px" color="grey-5" />
             <p>No churches to show yet.</p>
           </div>
 
           <div v-else>
+            <section
+              v-if="guestReservations.length"
+              class="participants-view-dialog__reservation-section"
+            >
+              <div class="participants-view-dialog__reservation-section-header">
+                <div>
+                  <h3 class="participants-view-dialog__reservation-section-title">
+                    Guest reservations
+                  </h3>
+                  <p class="participants-view-dialog__reservation-section-meta">
+                    Expected guests who are not members of any registered church ·
+                    {{ guestReservationTotal }} total
+                  </p>
+                </div>
+              </div>
+
+              <div class="row q-col-gutter-md participants-view-dialog__cards">
+                <div
+                  v-for="(reservation, index) in guestReservations"
+                  :key="reservation.id"
+                  class="col-12 col-sm-6 col-md-4 col-lg-3"
+                >
+                  <q-card flat bordered class="participants-view-dialog__stat-card participants-view-dialog__stat-card--static">
+                    <q-card-section class="row items-center no-wrap">
+                      <q-avatar
+                        :color="cardColor(index + 2)"
+                        text-color="white"
+                        icon="groups"
+                      />
+                      <div class="q-ml-md participants-view-dialog__stat-text">
+                        <div class="participants-view-dialog__stat-label">
+                          {{ reservation.label }}
+                        </div>
+                        <div class="participants-view-dialog__stat-value">
+                          {{ reservation.reservedCount }}
+                        </div>
+                      </div>
+                    </q-card-section>
+                  </q-card>
+                </div>
+              </div>
+            </section>
+
             <div class="row q-col-gutter-md participants-view-dialog__cards">
               <div
                 v-for="(group, index) in churchGroups"
@@ -146,9 +189,6 @@
                         <span>{{ group.adultCount }} adults</span>
                         <span>{{ group.kidsCount }} kids</span>
                       </div>
-                      <div v-if="group.reservedTotal" class="participants-view-dialog__stat-reserved">
-                        Reserved {{ group.reservedTotal }}
-                      </div>
                     </div>
                   </q-card-section>
                 </q-card>
@@ -165,9 +205,6 @@
                       · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
                     </span>
                     <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
-                    <span v-if="selectedGroup.reservedTotal">
-                      · {{ selectedGroup.reservedTotal }} reserved
-                    </span>
                   </p>
                 </div>
                 <div class="participants-view-dialog__detail-actions">
@@ -204,50 +241,6 @@
                     @click="exportChurch(selectedGroup)"
                   />
                 </div>
-              </div>
-
-              <div class="participants-view-dialog__reservations">
-                <div class="participants-view-dialog__reservations-header">
-                  <h4 class="participants-view-dialog__reservations-title">Reservations</h4>
-                  <span
-                    v-if="selectedGroupReservations.length"
-                    class="participants-view-dialog__reservations-total"
-                  >
-                    Total {{ selectedGroup.reservedTotal }}
-                  </span>
-                </div>
-
-                <div
-                  v-if="selectedGroupReservations.length"
-                  class="participants-view-dialog__reservation-list"
-                >
-                  <div
-                    v-for="reservation in selectedGroupReservations"
-                    :key="reservation.id"
-                    class="participants-view-dialog__reservation-row"
-                  >
-                    <div class="participants-view-dialog__reservation-main">
-                      <span class="participants-view-dialog__reservation-type">
-                        {{ reservation.participantType }}
-                      </span>
-                      <span
-                        v-if="reservation.label && reservation.label !== selectedGroup.churchName"
-                        class="participants-view-dialog__reservation-label"
-                      >
-                        {{ reservation.label }}
-                      </span>
-                      <span v-if="reservation.notes" class="participants-view-dialog__reservation-notes">
-                        {{ reservation.notes }}
-                      </span>
-                    </div>
-                    <strong class="participants-view-dialog__reservation-count">
-                      {{ reservation.reservedCount }}
-                    </strong>
-                  </div>
-                </div>
-                <p v-else class="participants-view-dialog__reservations-empty">
-                  No reservations for this church yet.
-                </p>
               </div>
 
               <q-table
@@ -419,26 +412,22 @@ const churchColumns = [
 const churchGroups = computed(() => {
   const map = new Map();
 
-  function ensureGroup(key, churchId, churchName) {
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        churchId: churchId ?? null,
-        churchName,
-        participants: [],
-        attendedCount: 0,
-        kidsCount: 0,
-        reservations: []
-      });
-    }
-    return map.get(key);
-  }
-
   props.participants.forEach((participant) => {
     const key = participant.churchId ?? "unassigned";
     const churchName = participant.churchName || "Unassigned";
-    const group = ensureGroup(key, participant.churchId, churchName);
 
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        churchId: participant.churchId ?? null,
+        churchName,
+        participants: [],
+        attendedCount: 0,
+        kidsCount: 0
+      });
+    }
+
+    const group = map.get(key);
     group.participants.push({
       ...participant,
       displayLastName: participant.lastName || participant.fullName || "—",
@@ -454,51 +443,35 @@ const churchGroups = computed(() => {
     }
   });
 
-  props.reservations.forEach((reservation) => {
-    const key = reservation.churchId ?? "unassigned";
-    const churchName = reservation.churchName || reservation.label || "Unassigned";
-    const group = ensureGroup(key, reservation.churchId, churchName);
-    if (!group.churchName || group.churchName === "Unassigned") {
-      group.churchName = churchName;
-    }
-    group.reservations.push(reservation);
-  });
-
   return Array.from(map.values())
-    .map((group) => {
-      const reservedTotal = group.reservations.reduce(
-        (sum, row) => sum + Number(row.reservedCount || 0),
-        0
-      );
-      return {
-        ...group,
-        reservedTotal,
-        adultCount: group.participants.length - group.kidsCount,
-        reservations: [...group.reservations].sort((a, b) => {
-          const type = String(a.participantType || "").localeCompare(
-            String(b.participantType || ""),
-            undefined,
-            { sensitivity: "base" }
-          );
-          if (type !== 0) return type;
-          return Number(b.reservedCount || 0) - Number(a.reservedCount || 0);
-        }),
-        participants: group.participants.sort((a, b) => {
-          const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
-          if (last !== 0) return last;
-          return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
-        })
-      };
-    })
+    .map((group) => ({
+      ...group,
+      adultCount: group.participants.length - group.kidsCount,
+      participants: group.participants.sort((a, b) => {
+        const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
+        if (last !== 0) return last;
+        return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
+      })
+    }))
     .sort((a, b) => compareChurchNamesMainFirst(a.churchName, b.churchName));
 });
+
+const guestReservations = computed(() =>
+  [...(props.reservations || [])]
+    .filter((row) => !row.churchId)
+    .sort((a, b) =>
+      String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity: "base" })
+    )
+);
+
+const guestReservationTotal = computed(() =>
+  guestReservations.value.reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
+);
 
 const selectedGroup = computed(() => {
   if (!selectedKey.value) return null;
   return churchGroups.value.find((group) => group.key === selectedKey.value) || null;
 });
-
-const selectedGroupReservations = computed(() => selectedGroup.value?.reservations || []);
 
 const unlinkedInSelectedGroup = computed(() => {
   if (!selectedGroup.value) return [];
@@ -715,6 +688,10 @@ watch(
   box-shadow: 0 0 0 1px #1976d2;
 }
 
+.participants-view-dialog__stat-card--static {
+  cursor: default;
+}
+
 .participants-view-dialog__stat-text {
   min-width: 0;
 }
@@ -747,11 +724,33 @@ watch(
   line-height: 1.25;
 }
 
-.participants-view-dialog__stat-reserved {
-  margin-top: 2px;
-  font-size: 0.68rem;
+.participants-view-dialog__reservation-section {
+  margin: 0 0 16px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+}
+
+.participants-view-dialog__reservation-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.participants-view-dialog__reservation-section-title {
+  margin: 0;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #1976d2;
+  color: #1a1a2e;
+}
+
+.participants-view-dialog__reservation-section-meta {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .participants-view-dialog__detail {
@@ -785,81 +784,6 @@ watch(
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: #6b7280;
-}
-
-.participants-view-dialog__reservations {
-  padding: 12px 14px;
-  border-bottom: 1px solid #eef1f6;
-  background: #fff;
-}
-
-.participants-view-dialog__reservations-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.participants-view-dialog__reservations-title {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #1a1a2e;
-}
-
-.participants-view-dialog__reservations-total {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #374151;
-}
-
-.participants-view-dialog__reservation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.participants-view-dialog__reservation-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid #eef1f6;
-  border-radius: 8px;
-  background: #fafbfc;
-}
-
-.participants-view-dialog__reservation-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.participants-view-dialog__reservation-type {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #1a1a2e;
-}
-
-.participants-view-dialog__reservation-label,
-.participants-view-dialog__reservation-notes {
-  font-size: 0.72rem;
-  color: #6b7280;
-}
-
-.participants-view-dialog__reservation-count {
-  font-size: 0.95rem;
-  color: #1a1a2e;
-  flex-shrink: 0;
-}
-
-.participants-view-dialog__reservations-empty {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #9ca3af;
 }
 
 .participants-view-dialog__qr img {
