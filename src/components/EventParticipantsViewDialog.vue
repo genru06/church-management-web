@@ -77,7 +77,7 @@
 
             <template #body-cell-churchName="props">
               <q-td :props="props">
-                <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
+                <span class="entity-table__muted">{{ props.row.displayChurch || "—" }}</span>
               </q-td>
             </template>
 
@@ -135,7 +135,8 @@
                   </h3>
                   <p class="participants-view-dialog__reservation-section-meta">
                     Expected guests who are not members of any registered church ·
-                    {{ guestReservationTotal }} total
+                    {{ guestReservationTotal }} reserved ·
+                    {{ guestReservationRegisteredTotal }} registered
                   </p>
                 </div>
               </div>
@@ -143,10 +144,16 @@
               <div class="row q-col-gutter-md participants-view-dialog__cards">
                 <div
                   v-for="(reservation, index) in guestReservations"
-                  :key="reservation.id"
+                  :key="reservation.key"
                   class="col-12 col-sm-6 col-md-4 col-lg-3"
                 >
-                  <q-card flat bordered class="participants-view-dialog__stat-card participants-view-dialog__stat-card--static">
+                  <q-card
+                    flat
+                    bordered
+                    class="participants-view-dialog__stat-card"
+                    :class="{ 'participants-view-dialog__stat-card--active': selectedKey === reservation.key }"
+                    @click="selectGroup(reservation)"
+                  >
                     <q-card-section class="row items-center no-wrap">
                       <q-avatar
                         :color="cardColor(index + 2)"
@@ -158,7 +165,10 @@
                           {{ reservation.label }}
                         </div>
                         <div class="participants-view-dialog__stat-value">
-                          {{ reservation.reservedCount }}
+                          {{ reservation.participants.length }}
+                          <span class="participants-view-dialog__stat-reserved">
+                            / {{ reservation.reservedCount }} reserved
+                          </span>
                         </div>
                       </div>
                     </q-card-section>
@@ -178,7 +188,7 @@
                   bordered
                   class="participants-view-dialog__stat-card"
                   :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
-                  @click="selectChurch(group)"
+                  @click="selectGroup(group)"
                 >
                   <q-card-section class="row items-center no-wrap">
                     <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
@@ -198,9 +208,12 @@
             <section v-if="selectedGroup" class="participants-view-dialog__detail entity-page__panel">
               <div class="participants-view-dialog__detail-header">
                 <div>
-                  <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.churchName }}</h3>
+                  <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.title }}</h3>
                   <p class="participants-view-dialog__detail-meta">
                     {{ selectedGroup.participants.length }} participant(s)
+                    <span v-if="selectedGroup.isReservation">
+                      · {{ selectedGroup.reservedCount }} reserved
+                    </span>
                     <span v-if="selectedGroup.kidsCount">
                       · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
                     </span>
@@ -228,7 +241,7 @@
                     icon="print"
                     label="Print sheet"
                     :disable="!selectedGroup.participants.length"
-                    @click="printChurch(selectedGroup)"
+                    @click="printGroup(selectedGroup)"
                   />
                   <q-btn
                     dense
@@ -238,7 +251,7 @@
                     icon="download"
                     label="Export Excel"
                     :disable="!selectedGroup.participants.length"
-                    @click="exportChurch(selectedGroup)"
+                    @click="exportGroup(selectedGroup)"
                   />
                 </div>
               </div>
@@ -282,7 +295,11 @@
 
                 <template #no-data>
                   <div class="full-width row flex-center q-pa-md text-grey-6">
-                    No registered participants for this church yet.
+                    {{
+                      selectedGroup.isReservation
+                        ? "No registered participants for this reservation list yet."
+                        : "No registered participants for this church yet."
+                    }}
                   </div>
                 </template>
               </q-table>
@@ -338,7 +355,8 @@ const sortedParticipants = computed(() =>
       displayLastName: participant.lastName || participant.fullName || "—",
       displayFirstName:
         participant.firstName ||
-        (participant.lastName || !participant.fullName ? "—" : "")
+        (participant.lastName || !participant.fullName ? "—" : ""),
+      displayChurch: participant.churchName || participant.reservationLabel || "—"
     }))
     .sort((a, b) => {
       const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
@@ -361,6 +379,7 @@ function filterParticipants(rows, terms) {
       row.displayFirstName,
       row.displayLastName,
       row.churchName,
+      row.reservationLabel,
       row.lifegroupName,
       row.email,
       row.phone,
@@ -378,7 +397,7 @@ const allColumns = computed(() => {
   const columns = [
     { name: "displayLastName", label: "Last name", field: "displayLastName", align: "left", sortable: true },
     { name: "displayFirstName", label: "First name", field: "displayFirstName", align: "left", sortable: true },
-    { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
+    { name: "churchName", label: "Church / List", field: "displayChurch", align: "left", sortable: true },
     { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true }
   ];
 
@@ -409,10 +428,30 @@ const churchColumns = [
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" }
 ];
 
+function mapParticipantRow(participant) {
+  return {
+    ...participant,
+    displayLastName: participant.lastName || participant.fullName || "—",
+    displayFirstName:
+      participant.firstName ||
+      (participant.lastName || !participant.fullName ? "—" : "")
+  };
+}
+
+function sortParticipantRows(participants) {
+  return [...participants].sort((a, b) => {
+    const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
+    if (last !== 0) return last;
+    return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
+  });
+}
+
 const churchGroups = computed(() => {
   const map = new Map();
 
   props.participants.forEach((participant) => {
+    if (participant.reservationId && !participant.churchId) return;
+
     const key = participant.churchId ?? "unassigned";
     const churchName = participant.churchName || "Unassigned";
 
@@ -421,6 +460,8 @@ const churchGroups = computed(() => {
         key,
         churchId: participant.churchId ?? null,
         churchName,
+        title: churchName,
+        isReservation: false,
         participants: [],
         attendedCount: 0,
         kidsCount: 0
@@ -428,13 +469,7 @@ const churchGroups = computed(() => {
     }
 
     const group = map.get(key);
-    group.participants.push({
-      ...participant,
-      displayLastName: participant.lastName || participant.fullName || "—",
-      displayFirstName:
-        participant.firstName ||
-        (participant.lastName || !participant.fullName ? "—" : "")
-    });
+    group.participants.push(mapParticipantRow(participant));
     if (participant.attendedAt) {
       group.attendedCount += 1;
     }
@@ -447,30 +482,65 @@ const churchGroups = computed(() => {
     .map((group) => ({
       ...group,
       adultCount: group.participants.length - group.kidsCount,
-      participants: group.participants.sort((a, b) => {
-        const last = (a.displayLastName || "").localeCompare(b.displayLastName || "");
-        if (last !== 0) return last;
-        return (a.displayFirstName || "").localeCompare(b.displayFirstName || "");
-      })
+      participants: sortParticipantRows(group.participants)
     }))
     .sort((a, b) => compareChurchNamesMainFirst(a.churchName, b.churchName));
 });
 
-const guestReservations = computed(() =>
-  [...(props.reservations || [])]
+const guestReservations = computed(() => {
+  const participantsByReservation = new Map();
+
+  props.participants.forEach((participant) => {
+    if (!participant.reservationId || participant.churchId) return;
+    const key = Number(participant.reservationId);
+    const list = participantsByReservation.get(key) || [];
+    list.push(mapParticipantRow(participant));
+    participantsByReservation.set(key, list);
+  });
+
+  return [...(props.reservations || [])]
     .filter((row) => !row.churchId)
+    .map((reservation) => {
+      const participants = sortParticipantRows(
+        participantsByReservation.get(Number(reservation.id)) || []
+      );
+      const attendedCount = participants.filter((row) => row.attendedAt).length;
+      const kidsCount = participants.filter((row) => row.isKid).length;
+
+      return {
+        key: `reservation-${reservation.id}`,
+        id: reservation.id,
+        reservationId: reservation.id,
+        label: reservation.label,
+        title: reservation.label,
+        isReservation: true,
+        reservedCount: Number(reservation.reservedCount || 0),
+        participants,
+        attendedCount,
+        kidsCount,
+        adultCount: participants.length - kidsCount
+      };
+    })
     .sort((a, b) =>
       String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity: "base" })
-    )
-);
+    );
+});
 
 const guestReservationTotal = computed(() =>
   guestReservations.value.reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
 );
 
+const guestReservationRegisteredTotal = computed(() =>
+  guestReservations.value.reduce((sum, row) => sum + row.participants.length, 0)
+);
+
 const selectedGroup = computed(() => {
   if (!selectedKey.value) return null;
-  return churchGroups.value.find((group) => group.key === selectedKey.value) || null;
+  return (
+    churchGroups.value.find((group) => group.key === selectedKey.value) ||
+    guestReservations.value.find((group) => group.key === selectedKey.value) ||
+    null
+  );
 });
 
 const unlinkedInSelectedGroup = computed(() => {
@@ -488,20 +558,20 @@ function close() {
   emit("update:modelValue", false);
 }
 
-function selectChurch(group) {
+function selectGroup(group) {
   selectedKey.value = group.key;
   loadQrCodes(group.participants);
 }
 
-function exportChurch(group) {
+function exportGroup(group) {
   exportParticipantsToExcel(group.participants, {
-    churchName: group.churchName,
+    churchName: group.title,
     eventName: props.event?.name
   });
-  $q.notify({ type: "positive", message: `Exported ${group.churchName} participants.` });
+  $q.notify({ type: "positive", message: `Exported ${group.title} participants.` });
 }
 
-function printChurch(group) {
+function printGroup(group) {
   router.push(getAttendancePrintUrl(props.eventId, { churchKey: group.key }));
 }
 
@@ -570,8 +640,9 @@ async function loadQrCodes(participants) {
 
 function onShow() {
   viewMode.value = props.initialView === "church" ? "church" : "all";
-  if (viewMode.value === "church" && churchGroups.value.length) {
-    selectChurch(churchGroups.value[0]);
+  if (viewMode.value === "church") {
+    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    if (firstGroup) selectGroup(firstGroup);
   }
 }
 
@@ -581,8 +652,9 @@ function onHide() {
 }
 
 watch(viewMode, (mode) => {
-  if (mode === "church" && churchGroups.value.length && !selectedKey.value) {
-    selectChurch(churchGroups.value[0]);
+  if (mode === "church" && !selectedKey.value) {
+    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    if (firstGroup) selectGroup(firstGroup);
   }
   if (mode === "all") {
     selectedKey.value = null;
@@ -594,13 +666,16 @@ watch(
   () => props.participants,
   () => {
     if (viewMode.value !== "church" || !selectedKey.value) return;
-    const group = churchGroups.value.find((item) => item.key === selectedKey.value);
+    const group =
+      churchGroups.value.find((item) => item.key === selectedKey.value) ||
+      guestReservations.value.find((item) => item.key === selectedKey.value);
     if (group) {
       loadQrCodes(group.participants);
       return;
     }
-    if (churchGroups.value.length) {
-      selectChurch(churchGroups.value[0]);
+    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    if (firstGroup) {
+      selectGroup(firstGroup);
     } else {
       selectedKey.value = null;
       qrByParticipant.value = {};
@@ -711,6 +786,12 @@ watch(
   font-weight: 600;
   color: #1a1a2e;
   line-height: 1.2;
+}
+
+.participants-view-dialog__stat-reserved {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #8b93a1;
 }
 
 .participants-view-dialog__stat-breakdown {

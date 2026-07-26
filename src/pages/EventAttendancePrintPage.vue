@@ -26,7 +26,7 @@
         <p class="attendance-print-page__meta">
           {{ formatDate(event.eventDate) }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}
         </p>
-        <p v-if="churchLabel" class="attendance-print-page__church">Church: {{ churchLabel }}</p>
+        <p v-if="churchLabel" class="attendance-print-page__church">{{ groupLabelPrefix }}: {{ churchLabel }}</p>
         <p class="attendance-print-page__count">{{ participants.length }} participant(s)</p>
       </header>
 
@@ -52,7 +52,7 @@
             </td>
             <td>{{ participant.lastName || "—" }}</td>
             <td>{{ participant.firstName || "—" }}</td>
-            <td>{{ participant.churchName || "—" }}</td>
+            <td>{{ participant.churchName || participant.reservationLabel || "—" }}</td>
             <td>{{ participant.lifegroupName || "—" }}</td>
           </tr>
         </tbody>
@@ -78,6 +78,11 @@ const route = useRoute();
 const router = useRouter();
 const eventId = props.id || route.params.id;
 const churchKey = computed(() => route.query.church || null);
+const reservationFilterId = computed(() => {
+  const key = String(churchKey.value || "");
+  const match = key.match(/^reservation-(\d+)$/);
+  return match ? Number(match[1]) : null;
+});
 
 const loading = ref(false);
 const event = ref(null);
@@ -87,15 +92,20 @@ const qrByParticipant = ref({});
 const participants = computed(() => {
   let rows = [...allParticipants.value];
 
-  if (churchKey.value) {
+  if (reservationFilterId.value) {
+    rows = rows.filter(
+      (participant) => Number(participant.reservationId) === reservationFilterId.value
+    );
+  } else if (churchKey.value) {
     rows = rows.filter((participant) => {
+      if (participant.reservationId && !participant.churchId) return false;
       const key = participant.churchId ?? "unassigned";
       return String(key) === String(churchKey.value);
     });
   }
 
   return rows.sort((a, b) => {
-    const last = (a.lastName || "").localeCompare(b.lastName || "");
+    const last = (a.lastName || a.fullName || "").localeCompare(b.lastName || b.fullName || "");
     if (last !== 0) return last;
     return (a.firstName || "").localeCompare(b.firstName || "");
   });
@@ -103,9 +113,14 @@ const participants = computed(() => {
 
 const churchLabel = computed(() => {
   if (!churchKey.value) return "";
+  if (reservationFilterId.value) {
+    return participants.value[0]?.reservationLabel || `Reservation ${reservationFilterId.value}`;
+  }
   if (churchKey.value === "unassigned") return "Unassigned";
   return participants.value[0]?.churchName || churchKey.value;
 });
+
+const groupLabelPrefix = computed(() => (reservationFilterId.value ? "Reservation list" : "Church"));
 
 function formatDate(value) {
   if (!value) return "—";

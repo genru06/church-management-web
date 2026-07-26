@@ -46,15 +46,15 @@
               :options="churchOptions"
               emit-value
               map-options
-              label="Church *"
+              clearable
+              label="Church"
               dense
               outlined
               hide-bottom-space
-              :rules="[requiredRule]"
               @update:model-value="onChurchChange"
             />
           </div>
-          <div class="col-12">
+          <div v-if="form.churchId" class="col-12">
             <AppSelect
               v-model="form.lifegroupId"
               :options="filteredLifegroupOptions"
@@ -65,7 +65,20 @@
               dense
               outlined
               hide-bottom-space
-              :disable="!form.churchId"
+            />
+          </div>
+          <div v-else-if="reservationOptions.length" class="col-12">
+            <AppSelect
+              v-model="form.reservationId"
+              :options="reservationOptions"
+              emit-value
+              map-options
+              clearable
+              label="Reservation list"
+              dense
+              outlined
+              hide-bottom-space
+              hint="Select a guest reservation list if you are not registering under a church."
             />
           </div>
         </div>
@@ -114,6 +127,7 @@ const signupInfo = ref(null);
 const loadError = ref("");
 const churchOptions = ref([]);
 const lifegroupOptions = ref([]);
+const reservationOptions = ref([]);
 
 const requiredRule = (val) => !!val || "Required";
 
@@ -124,7 +138,8 @@ function emptyForm() {
     firstName: "",
     lastName: "",
     churchId: null,
-    lifegroupId: null
+    lifegroupId: null,
+    reservationId: null
   };
 }
 
@@ -144,7 +159,13 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString();
 }
 
-function onChurchChange() {
+function onChurchChange(churchId) {
+  form.value.reservationId = null;
+  if (!churchId) {
+    form.value.lifegroupId = null;
+    return;
+  }
+
   if (!form.value.lifegroupId) return;
   const selected = lifegroupOptions.value.find((option) => option.value === form.value.lifegroupId);
   if (selected?.churchId && selected.churchId !== form.value.churchId) {
@@ -161,6 +182,10 @@ function applySignupOptions(data) {
     label: group.name,
     value: group.id,
     churchId: group.churchId
+  }));
+  reservationOptions.value = (data.reservations || []).map((reservation) => ({
+    label: reservation.label,
+    value: reservation.id
   }));
 }
 
@@ -186,7 +211,14 @@ async function submit() {
 
   saving.value = true;
   try {
-    const { data } = await api.post(`/events/${eventId}/signup`, form.value);
+    const payload = {
+      firstName: form.value.firstName,
+      lastName: form.value.lastName,
+      churchId: form.value.churchId || null,
+      lifegroupId: form.value.churchId ? form.value.lifegroupId || null : null,
+      reservationId: form.value.churchId ? null : form.value.reservationId || null
+    };
+    const { data } = await api.post(`/events/${eventId}/signup`, payload);
     resetForm();
 
     $q.notify({
