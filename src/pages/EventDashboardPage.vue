@@ -82,6 +82,20 @@
           </div>
         </div>
         <div class="col-6 col-sm-4 col-md-2">
+          <button
+            type="button"
+            class="event-stat-card event-stat-card--clickable"
+            @click="openParticipantsView('church')"
+          >
+            <span class="event-stat-card__label">Reserved</span>
+            <span class="event-stat-card__value">{{ reservationTotal || 0 }}</span>
+            <span class="event-stat-card__breakdown">
+              <span>{{ (dashboard.reservations || []).length }} guest list(s)</span>
+            </span>
+            <span class="event-stat-card__hint">View reservations</span>
+          </button>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Attended</span>
             <span class="event-stat-card__value">{{ dashboard.stats.attendedCount }}</span>
@@ -105,6 +119,78 @@
             <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.totalCollected) }}</span>
           </div>
         </div>
+      </section>
+
+      <section class="entity-page__panel q-mb-md">
+        <div class="event-dashboard__section-header">
+          <h2>Reservations</h2>
+          <div class="event-dashboard__section-actions">
+            <span v-if="reservationTotal" class="event-dashboard__reservation-total">
+              Total reserved: {{ reservationTotal }}
+            </span>
+            <q-btn
+              v-if="canManageReservations"
+              dense
+              unelevated
+              no-caps
+              color="primary"
+              icon="event_seat"
+              label="Add reservation"
+              @click="openReservationDialog"
+            />
+          </div>
+        </div>
+        <p class="event-dashboard__section-note">
+          Reserve expected guests who are not members of any registered church (e.g. Friends, Relatives).
+        </p>
+        <q-table
+          :rows="dashboard.reservations || []"
+          :columns="reservationColumns"
+          row-key="id"
+          flat
+          dense
+          :pagination="{ rowsPerPage: 10 }"
+          class="entity-table"
+        >
+          <template #body-cell-reservedCount="props">
+            <q-td :props="props">
+              <strong>{{ props.row.reservedCount }}</strong>
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" class="entity-table__actions">
+              <q-btn
+                v-if="canManageReservations"
+                flat
+                dense
+                round
+                size="sm"
+                color="grey-7"
+                icon="edit"
+                @click="editReservation(props.row)"
+              >
+                <q-tooltip>Edit</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="canManageReservations"
+                flat
+                dense
+                round
+                size="sm"
+                color="grey-7"
+                icon="delete_outline"
+                @click="removeReservation(props.row)"
+              >
+                <q-tooltip>Delete</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+          <template #no-data>
+            <div class="full-width row flex-center q-pa-md text-grey-6">
+              No reservations yet. Use Add reservation to enter guest group headcounts.
+            </div>
+          </template>
+        </q-table>
       </section>
 
       <section class="entity-page__panel q-mb-md">
@@ -235,78 +321,6 @@
             />
           </div>
         </div>
-      </section>
-
-      <section class="entity-page__panel q-mb-md">
-        <div class="event-dashboard__section-header">
-          <h2>Reservations</h2>
-          <div class="event-dashboard__section-actions">
-            <span v-if="reservationTotal" class="event-dashboard__reservation-total">
-              Total reserved: {{ reservationTotal }}
-            </span>
-            <q-btn
-              v-if="auth.canDo('action.events.edit')"
-              dense
-              unelevated
-              no-caps
-              color="primary"
-              icon="event_seat"
-              label="Add reservation"
-              @click="openReservationDialog"
-            />
-          </div>
-        </div>
-        <p class="event-dashboard__section-note">
-          Reserve expected guests who are not members of any registered church (e.g. Friends, Relatives).
-        </p>
-        <q-table
-          :rows="dashboard.reservations || []"
-          :columns="reservationColumns"
-          row-key="id"
-          flat
-          dense
-          :pagination="{ rowsPerPage: 10 }"
-          class="entity-table"
-        >
-          <template #body-cell-reservedCount="props">
-            <q-td :props="props">
-              <strong>{{ props.row.reservedCount }}</strong>
-            </q-td>
-          </template>
-          <template #body-cell-actions="props">
-            <q-td :props="props" class="entity-table__actions">
-              <q-btn
-                v-if="auth.canDo('action.events.edit')"
-                flat
-                dense
-                round
-                size="sm"
-                color="grey-7"
-                icon="edit"
-                @click="editReservation(props.row)"
-              >
-                <q-tooltip>Edit</q-tooltip>
-              </q-btn>
-              <q-btn
-                v-if="auth.canDo('action.events.edit')"
-                flat
-                dense
-                round
-                size="sm"
-                color="grey-7"
-                icon="delete_outline"
-                @click="removeReservation(props.row)"
-              >
-                <q-tooltip>Delete</q-tooltip>
-              </q-btn>
-            </q-td>
-          </template>
-          <template #no-data>
-            <div class="full-width row flex-center q-pa-md text-grey-6">
-              No reservations yet. Use Add reservation to enter guest group headcounts.
-            </div>
-          </template>
-        </q-table>
       </section>
 
       <section class="entity-page__panel q-mb-md">
@@ -780,6 +794,10 @@ const reservationTotal = computed(() =>
 
 const participantsWithReservedTotal = computed(
   () => Number(dashboard.value.stats?.participantCount || 0) + reservationTotal.value
+);
+
+const canManageReservations = computed(
+  () => auth.canDo("action.events.edit") || auth.canDo("action.events.manage_participants")
 );
 
 const reservationColumns = [

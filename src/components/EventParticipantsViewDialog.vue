@@ -641,7 +641,7 @@ async function loadQrCodes(participants) {
 function onShow() {
   viewMode.value = props.initialView === "church" ? "church" : "all";
   if (viewMode.value === "church") {
-    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    const firstGroup = guestReservations.value[0] || churchGroups.value[0];
     if (firstGroup) selectGroup(firstGroup);
   }
 }
@@ -653,7 +653,7 @@ function onHide() {
 
 watch(viewMode, (mode) => {
   if (mode === "church" && !selectedKey.value) {
-    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    const firstGroup = guestReservations.value[0] || churchGroups.value[0];
     if (firstGroup) selectGroup(firstGroup);
   }
   if (mode === "all") {
@@ -673,7 +673,7 @@ watch(
       loadQrCodes(group.participants);
       return;
     }
-    const firstGroup = churchGroups.value[0] || guestReservations.value[0];
+    const firstGroup = guestReservations.value[0] || churchGroups.value[0];
     if (firstGroup) {
       selectGroup(firstGroup);
     } else {
