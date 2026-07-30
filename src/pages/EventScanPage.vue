@@ -33,11 +33,12 @@
         <p class="entity-table__muted">Enter member's ID number.</p>
         <q-input
           v-model="manualPayload"
-          type="textarea"
-          autogrow
+          type="text"
+          inputmode="numeric"
           dense
           outlined
           placeholder="Member ID number"
+          @keyup.enter="submitManual"
         />
         <q-btn unelevated no-caps color="primary" label="Submit" class="q-mt-sm" :loading="checkingIn" @click="submitManual" />
       </div>
@@ -132,6 +133,15 @@ function isNotRegisteredError(err) {
   return /not registered to attend/i.test(text);
 }
 
+async function checkInMemberById(memberId) {
+  const { data } = await api.post(`/events/${eventId}/checkin`, {
+    type: "manual",
+    memberId
+  });
+  checkInResult.value = data;
+  resultDialogOpen.value = true;
+}
+
 async function processPayload(rawText) {
   if (processing) return;
   processing = true;
@@ -198,12 +208,35 @@ async function processPayload(rawText) {
 }
 
 async function submitManual() {
-  if (!manualPayload.value.trim()) return;
+  const raw = manualPayload.value.trim();
+  if (!raw || checkingIn.value) return;
+
+  const memberId = Number(raw);
+  if (!Number.isFinite(memberId) || memberId <= 0 || !/^\d+$/.test(raw)) {
+    $q.notify({ type: "negative", message: "Enter a valid member ID number." });
+    return;
+  }
+
   checkingIn.value = true;
+  processing = true;
   try {
-    await processPayload(manualPayload.value.trim());
+    await checkInMemberById(memberId);
     manualPayload.value = "";
+  } catch (err) {
+    if (isNotRegisteredError(err)) {
+      alertMessage.value = extractErrorMessage(
+        err,
+        `This member is not registered to attend this ${event.value?.name || "event"}.`
+      );
+      alertDialogOpen.value = true;
+    } else {
+      $q.notify({
+        type: "negative",
+        message: extractErrorMessage(err, "Failed to check in member.")
+      });
+    }
   } finally {
+    processing = false;
     checkingIn.value = false;
   }
 }
