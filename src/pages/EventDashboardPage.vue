@@ -566,9 +566,11 @@
       :event="dashboard.event"
       :participants="dashboard.participants"
       :reservations="dashboard.reservations || []"
+      :church-options="allChurchOptions"
       :has-registration-fee="hasRegistrationFee"
       :initial-view="participantsViewInitialMode"
       @linked="loadDashboard"
+      @deleted="loadDashboard"
     />
 
     <q-dialog v-model="templateDialogOpen" persistent>
@@ -966,6 +968,9 @@ function openParticipantDialog() {
 function openParticipantsView(mode = "all") {
   participantsViewInitialMode.value = mode;
   participantsViewDialogOpen.value = true;
+  if (!allChurchOptions.value.length) {
+    loadChurches();
+  }
 }
 
 function filterParticipants(rows, terms) {
