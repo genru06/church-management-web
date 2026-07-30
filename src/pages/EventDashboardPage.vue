@@ -154,11 +154,32 @@
         >
           <template #body-cell-reservedCount="props">
             <q-td :props="props">
-              <strong>{{ props.row.reservedCount }}</strong>
+              <strong>
+                {{ Number(props.row.filledCount || 0) }} / {{ props.row.reservedCount }}
+              </strong>
             </q-td>
           </template>
           <template #body-cell-actions="props">
             <q-td :props="props" class="entity-table__actions">
+              <q-btn
+                v-if="canManageReservations"
+                flat
+                dense
+                round
+                size="sm"
+                color="grey-7"
+                icon="person_add"
+                :disable="isReservationFilled(props.row)"
+                @click="openReservationNamesDialog(props.row)"
+              >
+                <q-tooltip>
+                  {{
+                    isReservationFilled(props.row)
+                      ? "Reservation is full"
+                      : "Add names to this reservation"
+                  }}
+                </q-tooltip>
+              </q-btn>
               <q-btn
                 v-if="canManageReservations"
                 flat
@@ -747,6 +768,97 @@
         </footer>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="reservationNamesDialogOpen" persistent>
+      <q-card class="entity-dialog">
+        <header class="entity-dialog__header">
+          <div>
+            <h2 class="entity-dialog__title">
+              Add names · {{ reservationNamesTarget?.label || "Reservation" }}
+            </h2>
+            <p class="entity-dialog__subtitle">
+              {{ reservationNamesFilledCount }} / {{ reservationNamesReservedCount }} filled ·
+              {{ reservationNamesRemaining }} slot(s) left
+            </p>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            color="grey-7"
+            :disable="reservationNamesSaving"
+            @click="reservationNamesDialogOpen = false"
+          />
+        </header>
+        <q-separator />
+        <q-card-section class="entity-dialog__body">
+          <div class="event-dashboard__reservation-names">
+            <div
+              v-for="(name, index) in reservationNames"
+              :key="index"
+              class="event-dashboard__reservation-name-row"
+            >
+              <q-input
+                v-model="reservationNames[index]"
+                :label="`Name ${index + 1}`"
+                dense
+                outlined
+                hide-bottom-space
+                :disable="reservationNamesSaving"
+                @keyup.enter="addReservationNameRow"
+              />
+              <q-btn
+                v-if="reservationNames.length > 1"
+                flat
+                dense
+                round
+                size="sm"
+                color="grey-7"
+                icon="close"
+                :disable="reservationNamesSaving"
+                @click="removeReservationNameRow(index)"
+              >
+                <q-tooltip>Remove</q-tooltip>
+              </q-btn>
+            </div>
+            <q-btn
+              flat
+              dense
+              no-caps
+              color="primary"
+              icon="add"
+              label="Add another name"
+              class="self-start"
+              :disable="
+                reservationNamesSaving || reservationNames.length >= reservationNamesRemaining
+              "
+              @click="addReservationNameRow"
+            />
+          </div>
+        </q-card-section>
+        <q-separator />
+        <footer class="entity-dialog__footer">
+          <q-btn
+            flat
+            no-caps
+            label="Cancel"
+            color="grey-8"
+            :disable="reservationNamesSaving"
+            @click="reservationNamesDialogOpen = false"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            label="Add names"
+            :loading="reservationNamesSaving"
+            :disable="reservationNamesSaving || !reservationNamesRemaining"
+            @click="saveReservationNames"
+          />
+        </footer>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -817,6 +929,10 @@ const reservationMode = ref("create");
 const reservationSaving = ref(false);
 const editingReservationId = ref(null);
 const reservationFormRef = ref(null);
+const reservationNamesDialogOpen = ref(false);
+const reservationNamesSaving = ref(false);
+const reservationNamesTarget = ref(null);
+const reservationNames = ref([""]);
 
 const requiredRule = (val) => !!val || "Required";
 const reservedCountRule = (val) =>
@@ -890,6 +1006,20 @@ const reservationColumns = [
   },
   { name: "actions", label: "", field: "actions", align: "right" }
 ];
+
+const reservationNamesFilledCount = computed(() =>
+  Number(reservationNamesTarget.value?.filledCount || 0)
+);
+const reservationNamesReservedCount = computed(() =>
+  Number(reservationNamesTarget.value?.reservedCount || 0)
+);
+const reservationNamesRemaining = computed(() =>
+  Math.max(reservationNamesReservedCount.value - reservationNamesFilledCount.value, 0)
+);
+
+function isReservationFilled(row) {
+  return Number(row?.filledCount || 0) >= Number(row?.reservedCount || 0);
+}
 
 const participantColumns = computed(() => {
   const columns = [
@@ -1327,6 +1457,70 @@ function editReservation(row) {
   reservationDialogOpen.value = true;
 }
 
+function openReservationNamesDialog(row) {
+  if (isReservationFilled(row)) return;
+  reservationNamesTarget.value = row;
+  reservationNames.value = [""];
+  reservationNamesDialogOpen.value = true;
+}
+
+function addReservationNameRow() {
+  if (reservationNames.value.length >= reservationNamesRemaining.value) return;
+  reservationNames.value.push("");
+}
+
+function removeReservationNameRow(index) {
+  if (reservationNames.value.length <= 1) {
+    reservationNames.value = [""];
+    return;
+  }
+  reservationNames.value.splice(index, 1);
+}
+
+async function saveReservationNames() {
+  const names = reservationNames.value.map((name) => String(name || "").trim()).filter(Boolean);
+  if (!names.length) {
+    $q.notify({ type: "warning", message: "Add at least one name." });
+    return;
+  }
+  if (names.length > reservationNamesRemaining.value) {
+    $q.notify({
+      type: "warning",
+      message: `Only ${reservationNamesRemaining.value} slot(s) left on this reservation.`
+    });
+    return;
+  }
+
+  reservationNamesSaving.value = true;
+  try {
+    const { data } = await api.post(
+      `/events/${eventId}/reservations/${reservationNamesTarget.value.id}/participants`,
+      { names }
+    );
+    const created = Number(data?.created || 0);
+    const errors = Array.isArray(data?.errors) ? data.errors : [];
+    if (created) {
+      $q.notify({
+        type: "positive",
+        message: created === 1 ? "1 name added." : `${created} names added.`
+      });
+    }
+    if (errors.length) {
+      $q.notify({
+        type: "warning",
+        message: errors.map((item) => item.message).join(" ")
+      });
+    }
+    reservationNamesDialogOpen.value = false;
+    loadDashboard();
+  } catch (err) {
+    const message = err?.response?.data?.message || "Failed to add names.";
+    $q.notify({ type: "negative", message: Array.isArray(message) ? message[0] : message });
+  } finally {
+    reservationNamesSaving.value = false;
+  }
+}
+
 async function saveReservation() {
   const valid = await reservationFormRef.value?.validate();
   if (!valid) return;
@@ -1529,6 +1723,22 @@ onMounted(loadDashboard);
   font-size: 0.82rem;
   font-weight: 600;
   color: #374151;
+}
+
+.event-dashboard__reservation-names {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-dashboard__reservation-name-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.event-dashboard__reservation-name-row .q-input {
+  flex: 1;
 }
 
 .event-dashboard__section-note {

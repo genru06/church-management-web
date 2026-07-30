@@ -1192,7 +1192,11 @@ function cardColor(index) {
 }
 
 function canLinkParticipant(participant) {
-  return !participant?.memberLinked && !participant?.memberId;
+  return (
+    selectedGroup.value?.key === "unassigned" &&
+    !participant?.memberLinked &&
+    !participant?.memberId
+  );
 }
 
 function confirmDeleteParticipant(participant) {
