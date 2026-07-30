@@ -364,6 +364,16 @@
               @click="openParticipantsView('church')"
             />
             <q-btn
+              dense
+              outline
+              no-caps
+              color="primary"
+              icon="sell"
+              label="By tag"
+              :disable="!dashboard.participants.length"
+              @click="openParticipantsView('tag')"
+            />
+            <q-btn
               v-if="auth.canDo('action.events.manage_participants')"
               dense
               unelevated
@@ -376,7 +386,7 @@
           </div>
         </div>
         <q-table
-          :rows="dashboard.participants"
+          :rows="tagFilteredParticipants"
           :columns="participantColumns"
           row-key="id"
           flat
@@ -387,7 +397,7 @@
           class="entity-table"
         >
           <template #top>
-            <div class="entity-table__toolbar">
+            <div class="event-dashboard__participants-toolbar">
               <q-input
                 v-model="participantFilter"
                 dense
@@ -400,6 +410,35 @@
                   <q-icon name="search" size="18px" color="grey-6" />
                 </template>
               </q-input>
+              <q-btn-toggle
+                v-model="participantTagMode"
+                no-caps
+                unelevated
+                dense
+                toggle-color="primary"
+                color="white"
+                text-color="grey-8"
+                :options="participantTagModeOptions"
+                :disable="!participantTagFilter.length"
+                class="event-dashboard__tag-mode"
+              />
+              <AppSelect
+                v-model="participantTagFilter"
+                :options="participantTagOptions"
+                dense
+                borderless
+                clearable
+                multiple
+                use-chips
+                emit-value
+                map-options
+                placeholder="Filter by tags"
+                class="event-dashboard__tag-select"
+              >
+                <template #prepend>
+                  <q-icon name="sell" size="18px" color="grey-6" />
+                </template>
+              </AppSelect>
             </div>
           </template>
 
@@ -411,6 +450,20 @@
           <template #body-cell-lifegroupName="props">
             <q-td :props="props">
               <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-tags="props">
+            <q-td :props="props">
+              <div v-if="props.row.tags?.length" class="event-dashboard__tags">
+                <q-badge
+                  v-for="tag in props.row.tags"
+                  :key="tag"
+                  outline
+                  color="grey-7"
+                  :label="tag"
+                />
+              </div>
+              <span v-else class="entity-table__muted">—</span>
             </q-td>
           </template>
           <template #body-cell-registrationPaid="props">
@@ -446,7 +499,7 @@
           <template #no-data>
             <div class="full-width row flex-center q-pa-md text-grey-6">
               {{
-                participantFilter
+                participantFilter || participantTagFilter.length
                   ? "No participants match your search."
                   : "No participants yet."
               }}
@@ -717,6 +770,10 @@ import {
   isRegistrationOpen
 } from "src/utils/eventRegistration";
 import { formatEventTime } from "src/utils/eventTime";
+import {
+  filterParticipantsByTags,
+  uniqueParticipantTags
+} from "src/utils/participantTags";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -770,6 +827,26 @@ const participantPagination = ref({
   descending: false
 });
 const participantFilter = ref("");
+const participantTagFilter = ref([]);
+const participantTagMode = ref("include");
+
+const participantTagModeOptions = [
+  { label: "Include", value: "include" },
+  { label: "Exclude", value: "exclude" }
+];
+
+const participantTagOptions = computed(() =>
+  uniqueParticipantTags(dashboard.value.participants).map((tag) => ({
+    label: tag,
+    value: tag
+  }))
+);
+
+const tagFilteredParticipants = computed(() =>
+  filterParticipantsByTags(dashboard.value.participants, participantTagFilter.value, {
+    exclude: participantTagMode.value === "exclude"
+  })
+);
 
 const templateScopeOptions = [
   { label: "General", value: "general" },
@@ -817,7 +894,8 @@ const participantColumns = computed(() => {
     { name: "lastName", label: "Last name", field: "lastName", align: "left", sortable: true },
     { name: "firstName", label: "First name", field: "firstName", align: "left", sortable: true },
     { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
-    { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true }
+    { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true },
+    { name: "tags", label: "Tags", field: "tags", align: "left" }
   ];
 
   if (Number(dashboard.value.event?.registrationFee || 0) > 0) {
@@ -953,6 +1031,12 @@ async function loadTemplateLifeGroups(churchId) {
 watch(templateChurchId, (churchId) => {
   templateLifeGroupId.value = null;
   loadTemplateLifeGroups(churchId);
+});
+
+watch(participantTagFilter, (tags) => {
+  if (!tags.length && participantTagMode.value === "exclude") {
+    participantTagMode.value = "include";
+  }
 });
 
 watch(templateScope, (scope) => {
@@ -1383,6 +1467,57 @@ onMounted(loadDashboard);
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.event-dashboard__participants-toolbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-dashboard__tag-mode {
+  flex-shrink: 0;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+
+  :deep(.q-btn) {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+}
+
+.event-dashboard__tag-select {
+  min-width: 200px;
+  max-width: 420px;
+  flex: 1 1 220px;
+
+  :deep(.q-field__control) {
+    min-height: 30px;
+    padding: 2px 8px;
+    background: #f5f7fa;
+    border-radius: 6px;
+  }
+
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
+    font-size: 0.8rem;
+    padding: 0;
+    min-height: 24px;
+  }
+
+  :deep(.q-chip) {
+    margin: 1px 2px;
+    font-size: 0.72rem;
+  }
+}
+
+.event-dashboard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .event-dashboard__reservation-total {
