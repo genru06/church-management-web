@@ -192,6 +192,7 @@ const columns = [
   { name: "location", label: "Location", field: "location", align: "left" },
   { name: "organizer", label: "Organizer", field: "organizer", align: "left" },
   { name: "expectedParticipants", label: "Expected", field: "expectedParticipants", align: "right", sortable: true },
+  { name: "reservedParticipants", label: "Reserved", field: "reservedParticipants", align: "right", sortable: true },
   { name: "status", label: "Status", field: "status", align: "left", sortable: true },
   { name: "eventType", label: "Type", field: "eventType", align: "left", sortable: true },
   { name: "registrationFee", label: "Fee", field: "registrationFee", align: "right", sortable: true },

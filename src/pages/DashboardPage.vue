@@ -48,6 +48,10 @@
               <span class="dashboard-upcoming__stat-value">{{ formatCount(event.expectedParticipants) }}</span>
             </div>
             <div class="dashboard-upcoming__stat">
+              <span class="dashboard-upcoming__stat-label">Reserved participants</span>
+              <span class="dashboard-upcoming__stat-value">{{ formatCount(event.reservedParticipants) }}</span>
+            </div>
+            <div class="dashboard-upcoming__stat">
               <span class="dashboard-upcoming__stat-label">Registered participants</span>
               <span class="dashboard-upcoming__stat-value">{{ event.registeredParticipants }}</span>
             </div>
