@@ -780,11 +780,7 @@ watch(lifeGroupFilterEnabled, (enabled) => {
   justify-content: flex-end;
 }
 
-@media (max-width: 599px) {
-  .members-page {
-    padding: 8px 10px 12px;
-  }
-
+@media (max-width: 1023px) {
   .members-page__heading {
     flex: 1 1 100%;
   }
@@ -793,10 +789,11 @@ watch(lifeGroupFilterEnabled, (enabled) => {
     flex: 1 1 100%;
     justify-content: flex-start;
   }
+}
 
-  .members-page__panel {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+@media (max-width: 599px) {
+  .members-page {
+    padding: 8px 10px 12px;
   }
 
   .members-table__search {
@@ -817,7 +814,8 @@ watch(lifeGroupFilterEnabled, (enabled) => {
   background: #fff;
   border: 1px solid #e4e8ef;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .members-table {

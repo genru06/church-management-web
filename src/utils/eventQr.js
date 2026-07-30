@@ -17,5 +17,11 @@ export function buildCheckInPayload(eventId, participant) {
 
 export async function generateQrDataUrl(text, size = 160) {
   const QRCode = (await import("qrcode")).default;
-  return QRCode.toDataURL(text, { width: size, margin: 1 });
+
+  try {
+    const svg = await QRCode.toString(text, { type: "svg", width: size, margin: 1 });
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  } catch {
+    return QRCode.toDataURL(text, { width: size, margin: 1 });
+  }
 }

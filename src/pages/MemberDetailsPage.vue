@@ -37,13 +37,24 @@
         </dl>
       </section>
 
-      <section v-if="qrDataUrl" class="member-profile__panel member-profile__qr">
+      <section class="member-profile__panel member-profile__qr">
         <h2 class="member-profile__section-title">Member QR code</h2>
         <p class="member-profile__qr-note">
           Unique identifier for event check-in. Use this same code for every event.
         </p>
-        <img :src="qrDataUrl" :alt="`${fullName} QR code`" class="member-profile__qr-image" />
-        <p class="member-profile__qr-id">ID #{{ member.id }}</p>
+        <div v-if="qrLoading" class="member-profile__qr-loading">
+          <q-spinner size="28px" color="primary" />
+        </div>
+        <img
+          v-else-if="qrDataUrl"
+          :src="qrDataUrl"
+          :alt="`${fullName} QR code`"
+          class="member-profile__qr-image"
+        />
+        <p v-else class="member-profile__qr-fallback">
+          {{ member.qrToken ? "Unable to generate QR code on this device." : "QR code is not available for this member yet." }}
+        </p>
+        <p v-if="member.id" class="member-profile__qr-id">ID #{{ member.id }}</p>
       </section>
     </div>
 
@@ -69,16 +80,21 @@ const member = ref({});
 const loading = ref(false);
 const formDialogOpen = ref(false);
 const qrDataUrl = ref("");
+const qrLoading = ref(false);
 
 async function refreshQr(memberData) {
   if (!memberData?.id || !memberData?.qrToken) {
     qrDataUrl.value = "";
+    qrLoading.value = false;
     return;
   }
+  qrLoading.value = true;
   try {
     qrDataUrl.value = await generateMemberQrDataUrl(memberData);
   } catch {
     qrDataUrl.value = "";
+  } finally {
+    qrLoading.value = false;
   }
 }
 
@@ -235,11 +251,27 @@ onMounted(async () => {
   color: #6b7280;
 }
 
+.member-profile__qr-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
 .member-profile__qr-image {
-  width: 200px;
-  height: 200px;
+  width: min(200px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
   display: block;
   margin: 0 auto;
+  max-width: 100%;
+  background: #fff;
+}
+
+.member-profile__qr-fallback {
+  margin: 0;
+  padding: 16px 8px;
+  font-size: 0.82rem;
+  color: #9a3412;
 }
 
 .member-profile__qr-id {
@@ -302,11 +334,7 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 599px) {
-  .member-profile {
-    padding: 8px 10px 16px;
-  }
-
+@media (max-width: 1023px) {
   .member-profile__header {
     flex-direction: column;
     align-items: stretch;
@@ -319,6 +347,12 @@ onMounted(async () => {
 
   .member-profile__meta {
     white-space: normal;
+  }
+}
+
+@media (max-width: 599px) {
+  .member-profile {
+    padding: 8px 10px 16px;
   }
 }
 

@@ -11,37 +11,37 @@
     </q-inner-loading>
 
     <section class="operations-stats row q-col-gutter-sm q-mb-md">
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Tithes</span>
           <span class="operations-stat-card__value">{{ formatCurrency(summary.tithesTotal) }}</span>
         </div>
       </div>
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Offerings</span>
           <span class="operations-stat-card__value">{{ formatCurrency(summary.offeringsTotal) }}</span>
         </div>
       </div>
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Pledges paid</span>
           <span class="operations-stat-card__value">{{ formatCurrency(summary.pledgesPaid) }}</span>
         </div>
       </div>
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Registration</span>
           <span class="operations-stat-card__value">{{ formatCurrency(summary.registrationTotal) }}</span>
         </div>
       </div>
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Expenses</span>
           <span class="operations-stat-card__value operations-stat-card__value--expense">{{ formatCurrency(summary.expensesTotal) }}</span>
         </div>
       </div>
-      <div class="col-6 col-sm-4 col-md-2">
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
         <div class="operations-stat-card">
           <span class="operations-stat-card__label">Net balance</span>
           <span class="operations-stat-card__value">{{ formatCurrency(summary.netBalance) }}</span>

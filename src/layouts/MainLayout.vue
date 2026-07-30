@@ -23,7 +23,13 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="leftDrawerOpen" show-if-above bordered :width="260">
+    <q-drawer
+      v-model="leftDrawerOpen"
+      show-if-above
+      bordered
+      :width="260"
+      :breakpoint="1024"
+    >
       <q-list class="q-pa-sm">
         <q-item class="q-mb-sm">
           <q-item-section avatar>
@@ -83,7 +89,9 @@ const $q = useQuasar();
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
-const leftDrawerOpen = ref($q.screen.gt.sm);
+// Keep in sync with drawer breakpoint (1024). Below that Quasar uses overlay mode,
+// so starting open on tablets/iPads covers the page and hides content underneath.
+const leftDrawerOpen = ref($q.screen.gt.md);
 
 watch(
   () => route.path,

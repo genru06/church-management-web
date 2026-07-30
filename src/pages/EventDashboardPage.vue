@@ -55,7 +55,7 @@
 
     <template v-if="dashboard.event">
       <section class="event-dashboard__stats row q-col-gutter-sm q-mb-md">
-        <div class="col-6 col-sm-4 col-md-2">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <button
             type="button"
             class="event-stat-card event-stat-card--clickable"
@@ -75,13 +75,13 @@
             <span class="event-stat-card__hint">View list</span>
           </button>
         </div>
-        <div class="col-6 col-sm-4 col-md-2">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Expected</span>
             <span class="event-stat-card__value">{{ dashboard.event.expectedParticipants || "—" }}</span>
           </div>
         </div>
-        <div class="col-6 col-sm-4 col-md-2">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <button
             type="button"
             class="event-stat-card event-stat-card--clickable"
@@ -95,25 +95,25 @@
             <span class="event-stat-card__hint">View reservations</span>
           </button>
         </div>
-        <div class="col-6 col-sm-4 col-md-2">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Attended</span>
             <span class="event-stat-card__value">{{ dashboard.stats.attendedCount }}</span>
           </div>
         </div>
-        <div class="col-6 col-sm-4 col-md-2">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Attendance</span>
             <span class="event-stat-card__value">{{ dashboard.stats.attendanceRate }}%</span>
           </div>
         </div>
-        <div v-if="hasRegistrationFee" class="col-6 col-sm-4 col-md-2">
+        <div v-if="hasRegistrationFee" class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Registration</span>
             <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.registrationCollected) }}</span>
           </div>
         </div>
-        <div v-if="showTotalCollected" class="col-6 col-sm-4 col-md-2">
+        <div v-if="showTotalCollected" class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
             <span class="event-stat-card__label">Total collected</span>
             <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.totalCollected) }}</span>
@@ -1477,7 +1477,7 @@ onMounted(loadDashboard);
   padding-top: 12px;
 }
 
-@media (max-width: 599px) {
+@media (max-width: 1023px) {
   .event-dashboard__section-header {
     flex-wrap: wrap;
     gap: 8px;

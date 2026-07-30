@@ -71,5 +71,12 @@ export function getEventSignupQrUrl(eventId) {
 
 export async function generateRegistrationQrDataUrl(eventId, size = 240) {
   const QRCode = (await import("qrcode")).default;
-  return QRCode.toDataURL(getEventSignupUrl(eventId), { width: size, margin: 2 });
+  const url = getEventSignupUrl(eventId);
+
+  try {
+    const svg = await QRCode.toString(url, { type: "svg", width: size, margin: 2 });
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  } catch {
+    return QRCode.toDataURL(url, { width: size, margin: 2 });
+  }
 }

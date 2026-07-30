@@ -258,7 +258,7 @@ onMounted(loadStats);
   font-size: 0.84rem;
 }
 
-@media (max-width: 599px) {
+@media (max-width: 1023px) {
   .dashboard-upcoming__stats {
     grid-template-columns: 1fr;
   }

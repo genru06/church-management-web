@@ -5,7 +5,9 @@ body {
 @import "./entity-ui.scss";
 
 .q-page {
+  // Prefer dvh on iPad/iOS so bottom content (e.g. member QR) is not cut off by the browser chrome.
   min-height: calc(100vh - 60px);
+  min-height: calc(100dvh - 60px);
 }
 
 .q-card {

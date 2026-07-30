@@ -59,7 +59,10 @@
   background: #fff;
   border: 1px solid #e4e8ef;
   border-radius: 8px;
-  overflow: hidden;
+  // Allow horizontal scroll on tablet/iPad — overflow:hidden clipped wide tables
+  // and QR columns between the phone (599px) and desktop (1024px) breakpoints.
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .entity-table {
@@ -291,11 +294,7 @@
   word-break: break-word;
 }
 
-@media (max-width: 599px) {
-  .entity-page {
-    padding: 8px 10px 12px;
-  }
-
+@media (max-width: 1023px) {
   .entity-page__header {
     align-items: flex-start;
   }
@@ -309,23 +308,6 @@
   .entity-page__header > .row {
     flex: 1 1 100%;
     justify-content: flex-start;
-  }
-
-  .entity-page__title {
-    font-size: 0.95rem;
-  }
-
-  .entity-page__panel {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .entity-table__search {
-    max-width: none;
-  }
-
-  .entity-table__toolbar {
-    min-width: 0;
   }
 
   .entity-details {
@@ -342,5 +324,23 @@
     .q-btn {
       flex: 1 1 auto;
     }
+  }
+}
+
+@media (max-width: 599px) {
+  .entity-page {
+    padding: 8px 10px 12px;
+  }
+
+  .entity-page__title {
+    font-size: 0.95rem;
+  }
+
+  .entity-table__search {
+    max-width: none;
+  }
+
+  .entity-table__toolbar {
+    min-width: 0;
   }
 }
