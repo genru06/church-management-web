@@ -439,7 +439,7 @@
                   flat
                   bordered
                   class="participants-view-dialog__stat-card"
-                  :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
+                  :class="{ 'participants-view-dialog__stat-card--active': String(selectedKey) === String(group.key) }"
                   @click="selectGroup(group)"
                 >
                   <q-card-section class="row items-center no-wrap">
@@ -545,20 +545,31 @@
                   </q-td>
                 </template>
 
-                <template #body-cell-actions="props">
-                  <q-td :props="props">
+                <template #body-cell-actions="cell">
+                  <q-td :props="cell" class="participants-view-dialog__actions-cell">
                     <div class="participants-view-dialog__row-actions">
                       <q-btn
-                        v-if="canLinkParticipant(props.row)"
+                        v-if="isLinkableGroupSelected"
                         flat
                         dense
                         round
                         color="secondary"
                         icon="link"
-                        :disable="linkingMembers || manualLinking || deletingParticipantId === props.row.id"
-                        @click="openManualLink(props.row)"
+                        :disable="
+                          !isParticipantUnlinked(cell.row) ||
+                          linkingMembers ||
+                          manualLinking ||
+                          deletingParticipantId === cell.row.id
+                        "
+                        @click.stop="openManualLink(cell.row)"
                       >
-                        <q-tooltip>Link to member</q-tooltip>
+                        <q-tooltip>
+                          {{
+                            isParticipantUnlinked(cell.row)
+                              ? "Link to member"
+                              : "Already linked to a member"
+                          }}
+                        </q-tooltip>
                       </q-btn>
                       <q-btn
                         flat
@@ -566,9 +577,9 @@
                         round
                         color="negative"
                         icon="delete_outline"
-                        :loading="deletingParticipantId === props.row.id"
+                        :loading="deletingParticipantId === cell.row.id"
                         :disable="linkingMembers || manualLinking || !!deletingParticipantId"
-                        @click="confirmDeleteParticipant(props.row)"
+                        @click.stop="confirmDeleteParticipant(cell.row)"
                       >
                         <q-tooltip>Delete participant</q-tooltip>
                       </q-btn>
@@ -1002,7 +1013,15 @@ const churchColumns = [
   { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left" },
   { name: "attendedAt", label: "Status", field: "attendedAt", align: "left" },
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" },
-  { name: "actions", label: "Actions", field: "actions", align: "center", sortable: false }
+  {
+    name: "actions",
+    label: "Actions",
+    field: "actions",
+    align: "center",
+    sortable: false,
+    style: "width: 112px; min-width: 112px;",
+    headerStyle: "width: 112px; min-width: 112px;"
+  }
 ];
 
 const tagColumns = [
@@ -1014,9 +1033,21 @@ const tagColumns = [
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" }
 ];
 
+function hasLinkedMemberId(memberId) {
+  return memberId != null && memberId !== "" && Number.isFinite(Number(memberId)) && Number(memberId) > 0;
+}
+
 function mapParticipantRow(participant) {
+  const memberId = participant.memberId ?? participant.member_id ?? null;
+  const memberLinked =
+    participant.memberLinked === true ||
+    participant.memberLinked === 1 ||
+    hasLinkedMemberId(memberId);
   return {
     ...participant,
+    memberId,
+    memberLinked,
+    isUnlinked: !memberLinked,
     displayLastName: participant.lastName || participant.fullName || "—",
     displayFirstName:
       participant.firstName ||
@@ -1037,19 +1068,21 @@ const churchGroups = computed(() => {
   const map = new Map();
 
   tagFilteredParticipants.value.forEach((participant) => {
-    if (participant.reservationId && !participant.churchId) return;
-
-    const key = participant.churchId ?? "unassigned";
-    const churchName = participant.churchName || "Unassigned";
+    // Unassigned includes everyone without a church, including guest-reservation
+    // participants, so linking works the same on every event.
+    const hasChurch = participant.churchId != null && participant.churchId !== "";
+    const key = hasChurch ? Number(participant.churchId) : "unassigned";
+    const churchName = hasChurch ? participant.churchName || "Church" : "Unassigned";
 
     if (!map.has(key)) {
       map.set(key, {
         key,
-        churchId: participant.churchId ?? null,
+        churchId: hasChurch ? Number(participant.churchId) : null,
         churchName,
         title: churchName,
         isReservation: false,
         isTag: false,
+        isUnassigned: !hasChurch,
         participants: [],
         attendedCount: 0,
         kidsCount: 0
@@ -1169,15 +1202,26 @@ const guestReservationRegisteredTotal = computed(() =>
 
 const selectedGroup = computed(() => findSelectedGroup(viewMode.value));
 
+const isLinkableGroupSelected = computed(() => {
+  // Prefer the selected card key so Unassigned stays linkable even if group lookup races.
+  if (selectedKey.value === "unassigned") return true;
+
+  const group = selectedGroup.value;
+  if (!group || group.isTag) return false;
+  // Guest reservation lists (no church) use the same linking rules.
+  if (group.isReservation) return true;
+  if (group.isUnassigned) return true;
+  if (group.key === "unassigned") return true;
+  return group.churchId == null;
+});
+
 const unlinkedInSelectedGroup = computed(() => {
   if (!selectedGroup.value || selectedGroup.value.isTag) return [];
-  return selectedGroup.value.participants.filter((participant) => !participant.memberLinked && !participant.memberId);
+  return selectedGroup.value.participants.filter((participant) => isParticipantUnlinked(participant));
 });
 
 const canLinkSelectedGroup = computed(
-  () =>
-    selectedGroup.value?.key === "unassigned" &&
-    unlinkedInSelectedGroup.value.length > 0
+  () => isLinkableGroupSelected.value && unlinkedInSelectedGroup.value.length > 0
 );
 
 const currentLinkResolve = computed(() => linkResolveQueue.value[linkResolveIndex.value] || null);
@@ -1191,12 +1235,16 @@ function cardColor(index) {
   return CARD_COLORS[index % CARD_COLORS.length];
 }
 
+function isParticipantUnlinked(participant) {
+  if (!participant) return false;
+  if (participant.isUnlinked === true) return true;
+  if (participant.isUnlinked === false) return false;
+  if (participant.memberLinked === true || participant.memberLinked === 1) return false;
+  return !hasLinkedMemberId(participant.memberId ?? participant.member_id ?? null);
+}
+
 function canLinkParticipant(participant) {
-  return (
-    selectedGroup.value?.key === "unassigned" &&
-    !participant?.memberLinked &&
-    !participant?.memberId
-  );
+  return isLinkableGroupSelected.value && isParticipantUnlinked(participant);
 }
 
 function confirmDeleteParticipant(participant) {
@@ -1755,8 +1803,10 @@ function firstGroupForMode(mode) {
 }
 
 function findSelectedGroup(mode = viewMode.value) {
-  if (!selectedKey.value) return null;
-  return groupsForMode(mode).find((group) => group.key === selectedKey.value) || null;
+  if (selectedKey.value == null || selectedKey.value === "") return null;
+  return (
+    groupsForMode(mode).find((group) => String(group.key) === String(selectedKey.value)) || null
+  );
 }
 
 function onShow() {
@@ -2144,11 +2194,17 @@ watch(
   z-index: 2;
 }
 
+.participants-view-dialog__actions-cell {
+  white-space: nowrap;
+  overflow: visible;
+}
+
 .participants-view-dialog__row-actions {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
+  white-space: nowrap;
 }
 
 .participants-view-dialog__manual-link-empty {
