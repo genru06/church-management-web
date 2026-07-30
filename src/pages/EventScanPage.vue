@@ -30,14 +30,14 @@
     <section class="entity-page__panel">
       <div class="event-scan-page__manual">
         <h3>Manual check-in</h3>
-        <p class="entity-table__muted">Paste QR payload JSON if camera scanning is unavailable.</p>
+        <p class="entity-table__muted">Enter member's ID number.</p>
         <q-input
           v-model="manualPayload"
           type="textarea"
           autogrow
           dense
           outlined
-          placeholder='{"type":"member","memberId":1,"token":"..."}'
+          placeholder="Member ID number"
         />
         <q-btn unelevated no-caps color="primary" label="Submit" class="q-mt-sm" :loading="checkingIn" @click="submitManual" />
       </div>
@@ -50,8 +50,24 @@
           <h3 class="q-mt-md q-mb-xs">{{ checkInResult?.fullName }}</h3>
           <p>{{ checkInResult?.alreadyCheckedIn ? "Already checked in." : "Attendance recorded successfully." }}</p>
         </q-card-section>
-        <q-card-actions align="center">
-          <q-btn unelevated no-caps color="primary" label="Continue scanning" @click="resultDialogOpen = false" />
+        <q-card-actions vertical align="stretch" class="q-px-md q-pb-md">
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            label="Continue scanning"
+            class="q-mb-sm"
+            @click="resultDialogOpen = false"
+          />
+          <q-btn
+            flat
+            no-caps
+            color="negative"
+            label="Cancel attendance"
+            :loading="cancelling"
+            :disable="!checkInResult?.id"
+            @click="cancelAttendance"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -90,6 +106,7 @@ const event = ref(null);
 const scanError = ref("");
 const manualPayload = ref("");
 const checkingIn = ref(false);
+const cancelling = ref(false);
 const resultDialogOpen = ref(false);
 const checkInResult = ref(null);
 const alertDialogOpen = ref(false);
@@ -188,6 +205,29 @@ async function submitManual() {
     manualPayload.value = "";
   } finally {
     checkingIn.value = false;
+  }
+}
+
+async function cancelAttendance() {
+  const participantId = checkInResult.value?.id;
+  if (!participantId || cancelling.value) return;
+
+  cancelling.value = true;
+  try {
+    await api.post(`/events/${eventId}/checkin/${participantId}/cancel`);
+    $q.notify({
+      type: "positive",
+      message: `Attendance cancelled for ${checkInResult.value?.fullName || "participant"}.`
+    });
+    resultDialogOpen.value = false;
+    checkInResult.value = null;
+  } catch (err) {
+    $q.notify({
+      type: "negative",
+      message: extractErrorMessage(err, "Failed to cancel attendance.")
+    });
+  } finally {
+    cancelling.value = false;
   }
 }
 
