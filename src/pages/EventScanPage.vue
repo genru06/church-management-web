@@ -38,6 +38,8 @@
           dense
           outlined
           placeholder="Member ID number"
+          @focus="onManualFocus"
+          @blur="onManualBlur"
           @keyup.enter="submitManual"
         />
         <q-btn unelevated no-caps color="primary" label="Submit" class="q-mt-sm" :loading="checkingIn" @click="submitManual" />
@@ -58,7 +60,7 @@
             color="primary"
             label="Continue scanning"
             class="q-mb-sm"
-            @click="resultDialogOpen = false"
+            @click="closeResultDialog"
           />
           <q-btn
             flat
@@ -81,7 +83,7 @@
           <p>{{ alertMessage }}</p>
         </q-card-section>
         <q-card-actions align="center">
-          <q-btn unelevated no-caps color="primary" label="Continue scanning" @click="alertDialogOpen = false" />
+          <q-btn unelevated no-caps color="primary" label="Continue scanning" @click="closeAlertDialog" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -114,7 +116,9 @@ const alertDialogOpen = ref(false);
 const alertMessage = ref("");
 
 let scanner = null;
-let processing = false;
+let scanBusy = false;
+let restartingScanner = false;
+let cameraNeedsRestart = false;
 
 function extractErrorMessage(err, fallback) {
   const message = err?.response?.data?.message;
@@ -133,37 +137,68 @@ function isNotRegisteredError(err) {
   return /not registered to attend/i.test(text);
 }
 
+function isDialogOpen() {
+  return resultDialogOpen.value || alertDialogOpen.value;
+}
+
+async function restartScanner() {
+  if (restartingScanner) return;
+  restartingScanner = true;
+  try {
+    await stopScanner();
+    await startScanner();
+    cameraNeedsRestart = false;
+  } finally {
+    restartingScanner = false;
+  }
+}
+
+async function ensureScannerReady() {
+  if (isDialogOpen() || checkingIn.value || scanBusy) return;
+  if (cameraNeedsRestart || !scanner?.isScanning) {
+    await restartScanner();
+  }
+}
+
+async function showCheckInResult(data) {
+  checkInResult.value = data;
+  resultDialogOpen.value = true;
+}
+
 async function checkInMemberById(memberId) {
   const { data } = await api.post(`/events/${eventId}/checkin`, {
     type: "manual",
     memberId
   });
-  checkInResult.value = data;
-  resultDialogOpen.value = true;
+  await showCheckInResult(data);
 }
 
 async function processPayload(rawText) {
-  if (processing) return;
-  processing = true;
+  // Keep QR and manual independent — only block QR while a QR request is in flight or a dialog is open.
+  if (scanBusy || checkingIn.value || isDialogOpen()) return;
+  scanBusy = true;
 
   try {
     const payload = JSON.parse(rawText);
     const memberId = payload.memberId != null && payload.memberId !== "" ? Number(payload.memberId) : null;
     const participantId =
       payload.participantId != null && payload.participantId !== "" ? Number(payload.participantId) : null;
-    const token = payload.token?.trim?.() || payload.token;
+    const token = typeof payload.token === "string" ? payload.token.trim() : payload.token;
     const isMemberQr =
       String(payload.type || "").toLowerCase() === "member" ||
-      (Number.isFinite(memberId) && memberId > 0 && token && !Number.isFinite(participantId));
+      (Number.isFinite(memberId) && memberId > 0 && !!token && !Number.isFinite(participantId));
 
     if (isMemberQr) {
+      if (!Number.isFinite(memberId) || memberId <= 0 || !token) {
+        $q.notify({ type: "negative", message: "Invalid member QR code." });
+        return;
+      }
       const { data } = await api.post(`/events/${eventId}/checkin`, {
         type: "member",
         memberId,
         token
       });
-      checkInResult.value = data;
-      resultDialogOpen.value = true;
+      await showCheckInResult(data);
       return;
     }
 
@@ -183,8 +218,7 @@ async function processPayload(rawText) {
       token
     });
 
-    checkInResult.value = data;
-    resultDialogOpen.value = true;
+    await showCheckInResult(data);
   } catch (err) {
     if (err instanceof SyntaxError) {
       $q.notify({ type: "negative", message: "Invalid or unreadable QR code." });
@@ -200,11 +234,21 @@ async function processPayload(rawText) {
     }
     $q.notify({
       type: "negative",
-      message: extractErrorMessage(err, "Invalid or unreadable QR code.")
+      message: extractErrorMessage(err, "Failed to record attendance.")
     });
   } finally {
-    processing = false;
+    scanBusy = false;
   }
+}
+
+function onManualFocus() {
+  // Focusing the manual input often breaks the camera stream on mobile browsers.
+  cameraNeedsRestart = true;
+}
+
+function onManualBlur() {
+  if (checkingIn.value || isDialogOpen()) return;
+  void ensureScannerReady();
 }
 
 async function submitManual() {
@@ -218,7 +262,7 @@ async function submitManual() {
   }
 
   checkingIn.value = true;
-  processing = true;
+  cameraNeedsRestart = true;
   try {
     await checkInMemberById(memberId);
     manualPayload.value = "";
@@ -236,9 +280,18 @@ async function submitManual() {
       });
     }
   } finally {
-    processing = false;
     checkingIn.value = false;
   }
+}
+
+async function closeResultDialog() {
+  resultDialogOpen.value = false;
+  await ensureScannerReady();
+}
+
+async function closeAlertDialog() {
+  alertDialogOpen.value = false;
+  await ensureScannerReady();
 }
 
 async function cancelAttendance() {
@@ -252,8 +305,9 @@ async function cancelAttendance() {
       type: "positive",
       message: `Attendance cancelled for ${checkInResult.value?.fullName || "participant"}.`
     });
-    resultDialogOpen.value = false;
     checkInResult.value = null;
+    resultDialogOpen.value = false;
+    await ensureScannerReady();
   } catch (err) {
     $q.notify({
       type: "negative",
@@ -272,10 +326,14 @@ async function startScanner() {
     await scanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: qrSize, height: qrSize } },
-      (decodedText) => processPayload(decodedText),
+      (decodedText) => {
+        void processPayload(decodedText);
+      },
       () => {}
     );
+    scanError.value = "";
   } catch {
+    scanner = null;
     scanError.value = "Camera access unavailable. Use manual check-in below.";
   }
 }
@@ -283,7 +341,9 @@ async function startScanner() {
 async function stopScanner() {
   if (!scanner) return;
   try {
-    await scanner.stop();
+    if (scanner.isScanning) {
+      await scanner.stop();
+    }
     await scanner.clear();
   } catch {
     // ignore cleanup errors
