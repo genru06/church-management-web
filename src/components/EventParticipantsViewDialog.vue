@@ -549,6 +549,23 @@
                   <q-td :props="cell" class="participants-view-dialog__actions-cell">
                     <div class="participants-view-dialog__row-actions">
                       <q-btn
+                        v-if="canEditLinkedUnassigned(cell.row)"
+                        flat
+                        dense
+                        round
+                        color="primary"
+                        icon="edit"
+                        :disable="
+                          linkingMembers ||
+                          manualLinking ||
+                          unassignedEditSaving ||
+                          deletingParticipantId === cell.row.id
+                        "
+                        @click.stop="openUnassignedEdit(cell.row)"
+                      >
+                        <q-tooltip>Edit member &amp; assign</q-tooltip>
+                      </q-btn>
+                      <q-btn
                         v-if="isLinkableGroupSelected"
                         flat
                         dense
@@ -846,6 +863,137 @@
       </q-card-section>
     </q-card>
   </q-dialog>
+
+  <q-dialog v-model="unassignedEditOpen" persistent>
+    <q-card class="participants-view-dialog__unassigned-edit entity-dialog" style="min-width: min(480px, 92vw)">
+      <header class="entity-dialog__header">
+        <div>
+          <h2 class="entity-dialog__title">Edit unassigned member</h2>
+          <p class="entity-dialog__subtitle">
+            Update member details and assign them to a church or guest list.
+          </p>
+        </div>
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          color="grey-7"
+          :disable="unassignedEditSaving"
+          @click="closeUnassignedEdit"
+        />
+      </header>
+
+      <q-separator />
+
+      <q-card-section class="entity-dialog__body">
+        <q-form ref="unassignedEditFormRef" class="entity-dialog__form" @submit.prevent="saveUnassignedEdit">
+          <div class="row q-col-gutter-sm">
+            <div class="col-12 col-sm-6">
+              <q-input
+                v-model="unassignedEditForm.firstName"
+                label="First name *"
+                dense
+                outlined
+                hide-bottom-space
+                :rules="[requiredRule]"
+              />
+            </div>
+            <div class="col-12 col-sm-6">
+              <q-input
+                v-model="unassignedEditForm.lastName"
+                label="Last name *"
+                dense
+                outlined
+                hide-bottom-space
+                :rules="[requiredRule]"
+              />
+            </div>
+            <div class="col-12 col-sm-6">
+              <q-input
+                v-model="unassignedEditForm.email"
+                type="email"
+                label="Email"
+                dense
+                outlined
+                hide-bottom-space
+              />
+            </div>
+            <div class="col-12 col-sm-6">
+              <q-input
+                v-model="unassignedEditForm.phone"
+                label="Phone"
+                dense
+                outlined
+                hide-bottom-space
+              />
+            </div>
+
+            <div class="col-12">
+              <div class="text-caption text-grey-7 q-mb-xs">Assign to *</div>
+              <q-option-group
+                v-model="unassignedEditForm.placement"
+                :options="unassignedPlacementOptions"
+                color="primary"
+                dense
+                inline
+              />
+            </div>
+
+            <div v-if="unassignedEditForm.placement === 'church'" class="col-12">
+              <AppSelect
+                v-model="unassignedEditForm.churchId"
+                :options="resolvedManualChurchOptions"
+                emit-value
+                map-options
+                clearable
+                label="Church *"
+                dense
+                outlined
+                hide-bottom-space
+                :loading="manualChurchesLoading"
+                :rules="[requiredRule]"
+              />
+            </div>
+
+            <div v-else class="col-12">
+              <AppSelect
+                v-model="unassignedEditForm.reservationId"
+                :options="guestReservationOptions"
+                emit-value
+                map-options
+                clearable
+                label="Guest list *"
+                dense
+                outlined
+                hide-bottom-space
+                :rules="[requiredRule]"
+              />
+              <p v-if="!guestReservationOptions.length" class="text-caption text-grey-6 q-mt-xs q-mb-none">
+                No guest reservation lists yet. Add one from the event dashboard first.
+              </p>
+            </div>
+          </div>
+        </q-form>
+      </q-card-section>
+
+      <q-separator />
+
+      <footer class="entity-dialog__footer">
+        <q-btn flat no-caps color="grey-7" label="Cancel" :disable="unassignedEditSaving" @click="closeUnassignedEdit" />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          label="Save"
+          icon="save"
+          :loading="unassignedEditSaving"
+          :disable="unassignedEditSaving"
+          @click="saveUnassignedEdit"
+        />
+      </footer>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup>
@@ -878,7 +1026,7 @@ const props = defineProps({
   initialView: { type: String, default: "all" }
 });
 
-const emit = defineEmits(["update:modelValue", "linked", "deleted"]);
+const emit = defineEmits(["update:modelValue", "linked", "deleted", "updated"]);
 
 const $q = useQuasar();
 const router = useRouter();
@@ -913,6 +1061,24 @@ const manualChurchOptions = ref([]);
 const manualChurchSelectOptions = ref([]);
 const manualChurchesLoading = ref(false);
 const manualAddFormRef = ref(null);
+const unassignedEditOpen = ref(false);
+const unassignedEditSaving = ref(false);
+const unassignedEditParticipant = ref(null);
+const unassignedEditFormRef = ref(null);
+const unassignedEditForm = ref({
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  placement: "church",
+  churchId: null,
+  reservationId: null
+});
+const requiredRule = (val) => !!val || "Required";
+const unassignedPlacementOptions = [
+  { label: "Church", value: "church" },
+  { label: "Guest list", value: "guest" }
+];
 let manualLinkSearchTimer = null;
 let manualChurchesPromise = null;
 
@@ -1019,8 +1185,8 @@ const churchColumns = [
     field: "actions",
     align: "center",
     sortable: false,
-    style: "width: 112px; min-width: 112px;",
-    headerStyle: "width: 112px; min-width: 112px;"
+    style: "width: 148px; min-width: 148px;",
+    headerStyle: "width: 148px; min-width: 148px;"
   }
 ];
 
@@ -1068,8 +1234,9 @@ const churchGroups = computed(() => {
   const map = new Map();
 
   tagFilteredParticipants.value.forEach((participant) => {
-    // Unassigned includes everyone without a church, including guest-reservation
-    // participants, so linking works the same on every event.
+    // Reserved guests belong under Guest reservations, not Unassigned.
+    if (participant.reservationId && !participant.churchId) return;
+
     const hasChurch = participant.churchId != null && participant.churchId !== "";
     const key = hasChurch ? Number(participant.churchId) : "unassigned";
     const churchName = hasChurch ? participant.churchName || "Church" : "Unassigned";
@@ -1200,6 +1367,16 @@ const guestReservationRegisteredTotal = computed(() =>
   guestReservations.value.reduce((sum, row) => sum + row.participants.length, 0)
 );
 
+const guestReservationOptions = computed(() =>
+  [...(props.reservations || [])]
+    .filter((row) => !row.churchId)
+    .map((row) => ({
+      label: `${row.label} (${Number(row.filledCount || 0)}/${Number(row.reservedCount || 0)})`,
+      value: Number(row.id)
+    }))
+    .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: "base" }))
+);
+
 const selectedGroup = computed(() => findSelectedGroup(viewMode.value));
 
 const isLinkableGroupSelected = computed(() => {
@@ -1213,6 +1390,12 @@ const isLinkableGroupSelected = computed(() => {
   if (group.isUnassigned) return true;
   if (group.key === "unassigned") return true;
   return group.churchId == null;
+});
+
+const isUnassignedGroupSelected = computed(() => {
+  if (selectedKey.value === "unassigned") return true;
+  const group = selectedGroup.value;
+  return !!(group && (group.isUnassigned || group.key === "unassigned"));
 });
 
 const unlinkedInSelectedGroup = computed(() => {
@@ -1245,6 +1428,110 @@ function isParticipantUnlinked(participant) {
 
 function canLinkParticipant(participant) {
   return isLinkableGroupSelected.value && isParticipantUnlinked(participant);
+}
+
+function canEditLinkedUnassigned(participant) {
+  return isUnassignedGroupSelected.value && !isParticipantUnlinked(participant);
+}
+
+function openUnassignedEdit(participant) {
+  if (!canEditLinkedUnassigned(participant) || unassignedEditSaving.value) return;
+
+  let resolvedFirst = participant.firstName || "";
+  let resolvedLast = participant.lastName || "";
+
+  if ((!resolvedFirst || !resolvedLast) && participant.fullName) {
+    const parts = String(participant.fullName).trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      resolvedFirst = resolvedFirst || parts[0];
+      resolvedLast = resolvedLast || parts.slice(1).join(" ");
+    } else if (parts.length === 1) {
+      resolvedLast = resolvedLast || parts[0];
+    }
+  }
+
+  if (!resolvedFirst && participant.displayFirstName && participant.displayFirstName !== "—") {
+    resolvedFirst = participant.displayFirstName;
+  }
+  if (!resolvedLast && participant.displayLastName && participant.displayLastName !== "—") {
+    resolvedLast = participant.displayLastName;
+  }
+
+  unassignedEditParticipant.value = participant;
+  unassignedEditForm.value = {
+    firstName: resolvedFirst,
+    lastName: resolvedLast,
+    email: participant.email || "",
+    phone: participant.phone || "",
+    placement: "church",
+    churchId: null,
+    reservationId: null
+  };
+  unassignedEditOpen.value = true;
+  loadManualChurches();
+  unassignedEditFormRef.value?.resetValidation?.();
+}
+
+function closeUnassignedEdit() {
+  if (unassignedEditSaving.value) return;
+  unassignedEditOpen.value = false;
+  unassignedEditParticipant.value = null;
+}
+
+async function saveUnassignedEdit() {
+  const participant = unassignedEditParticipant.value;
+  if (!props.eventId || !participant?.id || unassignedEditSaving.value) return;
+
+  const valid = await unassignedEditFormRef.value?.validate?.();
+  if (valid === false) return;
+
+  const placement = unassignedEditForm.value.placement;
+  if (placement === "church" && !unassignedEditForm.value.churchId) {
+    $q.notify({ type: "negative", message: "Select a church." });
+    return;
+  }
+  if (placement === "guest" && !unassignedEditForm.value.reservationId) {
+    $q.notify({ type: "negative", message: "Select a guest list." });
+    return;
+  }
+
+  unassignedEditSaving.value = true;
+  try {
+    const payload = {
+      placement,
+      firstName: unassignedEditForm.value.firstName.trim(),
+      lastName: unassignedEditForm.value.lastName.trim(),
+      email: unassignedEditForm.value.email.trim() || null,
+      phone: unassignedEditForm.value.phone.trim() || null,
+      churchId: placement === "church" ? unassignedEditForm.value.churchId : null,
+      reservationId: placement === "guest" ? unassignedEditForm.value.reservationId : null
+    };
+
+    const { data } = await api.put(
+      `/events/${props.eventId}/participants/${participant.id}`,
+      payload
+    );
+
+    $q.notify({
+      type: "positive",
+      message:
+        placement === "church"
+          ? "Member updated and assigned to church."
+          : "Member updated and moved to guest list."
+    });
+    unassignedEditOpen.value = false;
+    unassignedEditParticipant.value = null;
+    emit("updated", data);
+  } catch (err) {
+    const message =
+      err?.response?.data?.message || err?.message || "Failed to update unassigned member.";
+    $q.notify({
+      type: "negative",
+      message: Array.isArray(message) ? message[0] : message
+    });
+  } finally {
+    unassignedEditSaving.value = false;
+  }
 }
 
 function confirmDeleteParticipant(participant) {

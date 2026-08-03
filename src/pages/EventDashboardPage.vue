@@ -592,6 +592,7 @@
       :initial-view="participantsViewInitialMode"
       @linked="loadDashboard"
       @deleted="loadDashboard"
+      @updated="loadDashboard"
     />
 
     <q-dialog v-model="templateDialogOpen" persistent>
