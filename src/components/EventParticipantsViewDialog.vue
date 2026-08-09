@@ -277,7 +277,7 @@
               </div>
 
               <q-table
-                :rows="selectedGroup.participants"
+                :rows="filteredSelectedGroupParticipants"
                 :columns="tagColumns"
                 row-key="id"
                 flat
@@ -285,6 +285,23 @@
                 :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
                 class="participants-view-dialog__table entity-table"
               >
+                <template #top>
+                  <div class="participants-view-dialog__table-toolbar">
+                    <q-input
+                      v-model="groupParticipantFilter"
+                      dense
+                      borderless
+                      clearable
+                      placeholder="Search this list…"
+                      class="entity-table__search"
+                    >
+                      <template #prepend>
+                        <q-icon name="search" size="18px" color="grey-6" />
+                      </template>
+                    </q-input>
+                  </div>
+                </template>
+
                 <template #body-cell-displayChurch="props">
                   <q-td :props="props">
                     <span class="entity-table__muted">{{ props.row.displayChurch || "—" }}</span>
@@ -294,6 +311,21 @@
                 <template #body-cell-lifegroupName="props">
                   <q-td :props="props">
                     <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+                  </q-td>
+                </template>
+
+                <template #body-cell-tags="props">
+                  <q-td :props="props">
+                    <div v-if="props.row.tags?.length" class="participants-view-dialog__tags">
+                      <q-badge
+                        v-for="tag in props.row.tags"
+                        :key="tag"
+                        outline
+                        color="grey-7"
+                        :label="tag"
+                      />
+                    </div>
+                    <span v-else class="entity-table__muted">—</span>
                   </q-td>
                 </template>
 
@@ -321,7 +353,11 @@
 
                 <template #no-data>
                   <div class="full-width row flex-center q-pa-md text-grey-6">
-                    No participants with this tag yet.
+                    {{
+                      groupParticipantFilter
+                        ? "No participants match your search."
+                        : "No participants with this tag yet."
+                    }}
                   </div>
                 </template>
               </q-table>
@@ -509,7 +545,7 @@
               </div>
 
               <q-table
-                :rows="selectedGroup.participants"
+                :rows="filteredSelectedGroupParticipants"
                 :columns="churchColumns"
                 row-key="id"
                 flat
@@ -517,9 +553,41 @@
                 :pagination="{ rowsPerPage: 25, sortBy: 'displayLastName', descending: false }"
                 class="participants-view-dialog__table entity-table"
               >
+                <template #top>
+                  <div class="participants-view-dialog__table-toolbar">
+                    <q-input
+                      v-model="groupParticipantFilter"
+                      dense
+                      borderless
+                      clearable
+                      placeholder="Search this list…"
+                      class="entity-table__search"
+                    >
+                      <template #prepend>
+                        <q-icon name="search" size="18px" color="grey-6" />
+                      </template>
+                    </q-input>
+                  </div>
+                </template>
+
                 <template #body-cell-lifegroupName="props">
                   <q-td :props="props">
                     <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
+                  </q-td>
+                </template>
+
+                <template #body-cell-tags="props">
+                  <q-td :props="props">
+                    <div v-if="props.row.tags?.length" class="participants-view-dialog__tags">
+                      <q-badge
+                        v-for="tag in props.row.tags"
+                        :key="tag"
+                        outline
+                        color="grey-7"
+                        :label="tag"
+                      />
+                    </div>
+                    <span v-else class="entity-table__muted">—</span>
                   </q-td>
                 </template>
 
@@ -549,7 +617,7 @@
                   <q-td :props="cell" class="participants-view-dialog__actions-cell">
                     <div class="participants-view-dialog__row-actions">
                       <q-btn
-                        v-if="canEditLinkedUnassigned(cell.row)"
+                        v-if="canEditUnassigned(cell.row)"
                         flat
                         dense
                         round
@@ -563,7 +631,24 @@
                         "
                         @click.stop="openUnassignedEdit(cell.row)"
                       >
-                        <q-tooltip>Edit member &amp; assign</q-tooltip>
+                        <q-tooltip>Edit &amp; assign</q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-else
+                        flat
+                        dense
+                        round
+                        color="primary"
+                        icon="edit"
+                        :disable="
+                          linkingMembers ||
+                          manualLinking ||
+                          unassignedEditSaving ||
+                          deletingParticipantId === cell.row.id
+                        "
+                        @click.stop="openParticipantEdit(cell.row)"
+                      >
+                        <q-tooltip>Edit participant</q-tooltip>
                       </q-btn>
                       <q-btn
                         v-if="isLinkableGroupSelected"
@@ -607,9 +692,11 @@
                 <template #no-data>
                   <div class="full-width row flex-center q-pa-md text-grey-6">
                     {{
-                      selectedGroup.isReservation
-                        ? "No registered participants for this reservation list yet."
-                        : "No registered participants for this church yet."
+                      groupParticipantFilter
+                        ? "No participants match your search."
+                        : selectedGroup.isReservation
+                          ? "No registered participants for this reservation list yet."
+                          : "No registered participants for this church yet."
                     }}
                   </div>
                 </template>
@@ -868,9 +955,9 @@
     <q-card class="participants-view-dialog__unassigned-edit entity-dialog" style="min-width: min(480px, 92vw)">
       <header class="entity-dialog__header">
         <div>
-          <h2 class="entity-dialog__title">Edit unassigned member</h2>
+          <h2 class="entity-dialog__title">Edit unassigned participant</h2>
           <p class="entity-dialog__subtitle">
-            Update member details and assign them to a church or guest list.
+            Update details and assign them to a church (as a member) or move them to a guest list.
           </p>
         </div>
         <q-btn
@@ -969,7 +1056,15 @@
                 hide-bottom-space
                 :rules="[requiredRule]"
               />
-              <p v-if="!guestReservationOptions.length" class="text-caption text-grey-6 q-mt-xs q-mb-none">
+              <p
+                v-if="unassignedGuestConflictLabel"
+                class="participants-view-dialog__transfer-warning"
+              >
+                {{ unassignedEditForm.firstName }} {{ unassignedEditForm.lastName }} already exists on
+                <strong>{{ unassignedGuestConflictLabel }}</strong>. Choose a different list or resolve
+                the duplicate first.
+              </p>
+              <p v-else-if="!guestReservationOptions.length" class="text-caption text-grey-6 q-mt-xs q-mb-none">
                 No guest reservation lists yet. Add one from the event dashboard first.
               </p>
             </div>
@@ -988,12 +1083,22 @@
           label="Save"
           icon="save"
           :loading="unassignedEditSaving"
-          :disable="unassignedEditSaving"
+          :disable="unassignedEditSaving || !!unassignedGuestConflictLabel"
           @click="saveUnassignedEdit"
         />
       </footer>
     </q-card>
   </q-dialog>
+
+  <EventParticipantFormDialog
+    v-model="participantEditOpen"
+    mode="edit"
+    :event-id="eventId"
+    :participant="participantEditTarget"
+    :reservations="reservations"
+    :participants="participants"
+    @saved="onParticipantEditSaved"
+  />
 </template>
 
 <script setup>
@@ -1002,6 +1107,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
+import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
@@ -1034,6 +1140,7 @@ const viewMode = ref("all");
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
 const participantFilter = ref("");
+const groupParticipantFilter = ref("");
 const tagFilter = ref([]);
 const tagMode = ref("include");
 const linkingMembers = ref(false);
@@ -1074,6 +1181,8 @@ const unassignedEditForm = ref({
   churchId: null,
   reservationId: null
 });
+const participantEditOpen = ref(false);
+const participantEditTarget = ref(null);
 const requiredRule = (val) => !!val || "Required";
 const unassignedPlacementOptions = [
   { label: "Church", value: "church" },
@@ -1177,6 +1286,7 @@ const churchColumns = [
   { name: "displayLastName", label: "Last name", field: "displayLastName", align: "left", sortable: true },
   { name: "displayFirstName", label: "First name", field: "displayFirstName", align: "left", sortable: true },
   { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left" },
+  { name: "tags", label: "Tags", field: "tags", align: "left" },
   { name: "attendedAt", label: "Status", field: "attendedAt", align: "left" },
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" },
   {
@@ -1195,6 +1305,7 @@ const tagColumns = [
   { name: "displayFirstName", label: "First name", field: "displayFirstName", align: "left", sortable: true },
   { name: "displayChurch", label: "Church / List", field: "displayChurch", align: "left", sortable: true },
   { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left" },
+  { name: "tags", label: "Tags", field: "tags", align: "left" },
   { name: "attendedAt", label: "Status", field: "attendedAt", align: "left" },
   { name: "qrCode", label: "QR code", field: "qrCode", align: "center" }
 ];
@@ -1377,7 +1488,51 @@ const guestReservationOptions = computed(() =>
     .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: "base" }))
 );
 
+const unassignedGuestConflictLabel = computed(() => {
+  if (unassignedEditForm.value.placement !== "guest" || !unassignedEditForm.value.reservationId) {
+    return "";
+  }
+
+  const firstName = String(unassignedEditForm.value.firstName || "").trim();
+  const lastName = String(unassignedEditForm.value.lastName || "").trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+  const nameKey = fullName.toLowerCase().replace(/\s+/g, " ");
+  if (!nameKey) return "";
+
+  const targetReservationId = Number(unassignedEditForm.value.reservationId);
+  const currentId = unassignedEditParticipant.value?.id;
+  const guestReservationIds = new Set(guestReservationOptions.value.map((row) => Number(row.value)));
+
+  const conflict = (props.participants || []).find((row) => {
+    if (currentId != null && Number(row.id) === Number(currentId)) return false;
+    if (row.memberId || row.churchId) return false;
+    const reservationId = row.reservationId != null ? Number(row.reservationId) : null;
+    if (!reservationId || !guestReservationIds.has(reservationId)) return false;
+    return (
+      String(row.fullName || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ") === nameKey
+    );
+  });
+
+  if (!conflict) return "";
+
+  const reservation = (props.reservations || []).find(
+    (row) => Number(row.id) === Number(conflict.reservationId)
+  );
+  // Prefer showing the selected list name when that is the conflict.
+  if (Number(conflict.reservationId) === targetReservationId) {
+    return reservation?.label || conflict.reservationLabel || "the selected guest list";
+  }
+  return reservation?.label || conflict.reservationLabel || "another guest list";
+});
+
 const selectedGroup = computed(() => findSelectedGroup(viewMode.value));
+
+const filteredSelectedGroupParticipants = computed(() =>
+  filterParticipantsBySearch(selectedGroup.value?.participants || [], groupParticipantFilter.value)
+);
 
 const isLinkableGroupSelected = computed(() => {
   // Prefer the selected card key so Unassigned stays linkable even if group lookup races.
@@ -1430,12 +1585,24 @@ function canLinkParticipant(participant) {
   return isLinkableGroupSelected.value && isParticipantUnlinked(participant);
 }
 
-function canEditLinkedUnassigned(participant) {
-  return isUnassignedGroupSelected.value && !isParticipantUnlinked(participant);
+function canEditUnassigned(participant) {
+  return isUnassignedGroupSelected.value && !!participant;
+}
+
+function openParticipantEdit(participant) {
+  if (!participant?.id) return;
+  participantEditTarget.value = participant;
+  participantEditOpen.value = true;
+}
+
+function onParticipantEditSaved(data) {
+  participantEditOpen.value = false;
+  participantEditTarget.value = null;
+  emit("updated", data);
 }
 
 function openUnassignedEdit(participant) {
-  if (!canEditLinkedUnassigned(participant) || unassignedEditSaving.value) return;
+  if (!canEditUnassigned(participant) || unassignedEditSaving.value) return;
 
   let resolvedFirst = participant.firstName || "";
   let resolvedLast = participant.lastName || "";
@@ -1494,6 +1661,13 @@ async function saveUnassignedEdit() {
     $q.notify({ type: "negative", message: "Select a guest list." });
     return;
   }
+  if (placement === "guest" && unassignedGuestConflictLabel.value) {
+    $q.notify({
+      type: "negative",
+      message: `${unassignedEditForm.value.firstName} ${unassignedEditForm.value.lastName} already exists on ${unassignedGuestConflictLabel.value}.`
+    });
+    return;
+  }
 
   unassignedEditSaving.value = true;
   try {
@@ -1516,15 +1690,15 @@ async function saveUnassignedEdit() {
       type: "positive",
       message:
         placement === "church"
-          ? "Member updated and assigned to church."
-          : "Member updated and moved to guest list."
+          ? "Participant assigned to church as a member."
+          : "Participant moved to the selected guest list."
     });
     unassignedEditOpen.value = false;
     unassignedEditParticipant.value = null;
     emit("updated", data);
   } catch (err) {
     const message =
-      err?.response?.data?.message || err?.message || "Failed to update unassigned member.";
+      err?.response?.data?.message || err?.message || "Failed to update unassigned participant.";
     $q.notify({
       type: "negative",
       message: Array.isArray(message) ? message[0] : message
@@ -1840,6 +2014,7 @@ function close() {
 
 function selectGroup(group) {
   selectedKey.value = group.key;
+  groupParticipantFilter.value = "";
   loadQrCodes(group.participants);
 }
 
@@ -2102,6 +2277,7 @@ function onShow() {
   tagFilter.value = [];
   tagMode.value = "include";
   participantFilter.value = "";
+  groupParticipantFilter.value = "";
   if (viewMode.value === "church" || viewMode.value === "tag") {
     const firstGroup = firstGroupForMode(viewMode.value);
     if (firstGroup) selectGroup(firstGroup);
@@ -2114,12 +2290,16 @@ function onHide() {
   tagFilter.value = [];
   tagMode.value = "include";
   participantFilter.value = "";
+  groupParticipantFilter.value = "";
+  participantEditOpen.value = false;
+  participantEditTarget.value = null;
   resetLinkResolveState();
   manualLinkOpen.value = false;
   resetManualLink();
 }
 
 watch(viewMode, (mode) => {
+  groupParticipantFilter.value = "";
   if (mode === "church" || mode === "tag") {
     const current = findSelectedGroup(mode);
     if (current) {
@@ -2492,6 +2672,16 @@ watch(
   justify-content: center;
   gap: 2px;
   white-space: nowrap;
+}
+
+.participants-view-dialog__transfer-warning {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff4e5;
+  color: #8a5a00;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .participants-view-dialog__manual-link-empty {

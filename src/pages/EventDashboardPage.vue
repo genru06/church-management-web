@@ -572,6 +572,8 @@
       :mode="participantMode"
       :event-id="eventId"
       :participant="editingParticipant"
+      :reservations="dashboard.reservations || []"
+      :participants="dashboard.participants || []"
       @saved="loadDashboard"
     />
 

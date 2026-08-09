@@ -10,7 +10,12 @@
         <div>
           <h2 class="entity-dialog__title">{{ mode === "create" ? "Add participant" : "Edit participant" }}</h2>
           <p class="entity-dialog__subtitle">
-            Add a guest participant, link an existing member, or register someone as a new member.
+            <template v-if="isEditingGuest">
+              Update guest details and choose which guest list they belong to.
+            </template>
+            <template v-else>
+              Add a guest participant, link an existing member, or register someone as a new member.
+            </template>
           </p>
         </div>
         <q-btn flat round dense icon="close" color="grey-7" :disable="saving" @click="close" />
@@ -21,7 +26,7 @@
       <q-card-section class="entity-dialog__body">
         <q-form ref="formRef" class="entity-dialog__form" @submit.prevent="submit">
           <div class="row q-col-gutter-sm">
-            <div class="col-12">
+            <div v-if="!isEditingGuest" class="col-12">
               <AppSelect
                 v-model="form.memberId"
                 :options="memberOptions"
@@ -106,6 +111,32 @@
             <div class="col-12 col-sm-6">
               <q-input v-model="form.phone" label="Phone" dense outlined hide-bottom-space />
             </div>
+
+            <div v-if="showGuestListSelect" class="col-12">
+              <AppSelect
+                v-model="form.reservationId"
+                :options="guestListOptions"
+                emit-value
+                map-options
+                clearable
+                label="Guest list *"
+                dense
+                outlined
+                hide-bottom-space
+                :rules="[requiredRule]"
+              />
+              <p
+                v-if="guestListConflictLabel"
+                class="event-participant-form__warning"
+              >
+                {{ form.fullName || "This guest" }} already exists on
+                <strong>{{ guestListConflictLabel }}</strong>.
+                Choose a different list or resolve the duplicate first.
+              </p>
+              <p v-else-if="!guestListOptions.length" class="event-participant-form__hint">
+                No guest reservation lists yet. Add one from the event dashboard first.
+              </p>
+            </div>
           </div>
         </q-form>
       </q-card-section>
@@ -120,6 +151,7 @@
           color="primary"
           :label="mode === 'create' ? 'Add participant' : 'Save changes'"
           :loading="saving"
+          :disable="saving || (!!guestListConflictLabel && isMovingGuestList)"
           @click="submit"
         />
       </footer>
@@ -128,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
@@ -138,7 +170,9 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   mode: { type: String, default: "create" },
   eventId: { type: [String, Number], required: true },
-  participant: { type: Object, default: null }
+  participant: { type: Object, default: null },
+  reservations: { type: Array, default: () => [] },
+  participants: { type: Array, default: () => [] }
 });
 
 const emit = defineEmits(["update:modelValue", "saved"]);
@@ -156,6 +190,7 @@ const emptyForm = () => ({
   memberId: null,
   addAsMember: false,
   churchId: null,
+  reservationId: null,
   firstName: "",
   lastName: "",
   fullName: "",
@@ -164,6 +199,70 @@ const emptyForm = () => ({
 });
 
 const form = ref(emptyForm());
+const originalReservationId = ref(null);
+
+function normalizeGuestName(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+const isEditingGuest = computed(() => {
+  if (props.mode !== "edit" || !props.participant) return false;
+  const memberId = props.participant.memberId ?? props.participant.member_id ?? null;
+  const hasMember =
+    memberId != null && memberId !== "" && Number.isFinite(Number(memberId)) && Number(memberId) > 0;
+  return !hasMember && !!props.participant.reservationId && !props.participant.churchId;
+});
+
+const showGuestListSelect = computed(() => {
+  if (isEditingGuest.value) return true;
+  return props.mode === "create" && !form.value.memberId && !form.value.addAsMember;
+});
+
+const guestListOptions = computed(() =>
+  [...(props.reservations || [])]
+    .filter((row) => !row.churchId)
+    .map((row) => ({
+      label: `${row.label} (${Number(row.filledCount || 0)}/${Number(row.reservedCount || 0)})`,
+      value: Number(row.id)
+    }))
+    .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { sensitivity: "base" }))
+);
+
+const isMovingGuestList = computed(() => {
+  if (!isEditingGuest.value) return false;
+  if (form.value.reservationId == null || originalReservationId.value == null) return false;
+  return Number(form.value.reservationId) !== Number(originalReservationId.value);
+});
+
+const guestListConflictLabel = computed(() => {
+  if (!isEditingGuest.value || !isMovingGuestList.value) return "";
+
+  const nameKey = normalizeGuestName(form.value.fullName || props.participant?.fullName);
+  if (!nameKey) return "";
+
+  const currentReservationId = Number(originalReservationId.value);
+  const guestReservationIds = new Set(guestListOptions.value.map((row) => Number(row.value)));
+
+  const conflict = (props.participants || []).find((row) => {
+    if (Number(row.id) === Number(props.participant?.id)) return false;
+    if (row.memberId || row.churchId) return false;
+    const reservationId = row.reservationId != null ? Number(row.reservationId) : null;
+    if (!reservationId || !guestReservationIds.has(reservationId)) return false;
+    // Ignore the guest's current list; flag matches on any other list.
+    if (reservationId === currentReservationId) return false;
+    return normalizeGuestName(row.fullName) === nameKey;
+  });
+
+  if (!conflict) return "";
+
+  const reservation = (props.reservations || []).find(
+    (row) => Number(row.id) === Number(conflict.reservationId)
+  );
+  return reservation?.label || conflict.reservationLabel || "another guest list";
+});
 
 function close() {
   if (saving.value) return;
@@ -172,6 +271,7 @@ function close() {
 
 function resetForm() {
   form.value = emptyForm();
+  originalReservationId.value = null;
   formRef.value?.resetValidation();
 }
 
@@ -206,6 +306,7 @@ function onMemberSelected(memberId) {
   if (!option) return;
   form.value.addAsMember = false;
   form.value.churchId = null;
+  form.value.reservationId = null;
   form.value.firstName = option.member.firstName || "";
   form.value.lastName = option.member.lastName || "";
   form.value.fullName = `${option.member.firstName} ${option.member.lastName}`;
@@ -221,6 +322,8 @@ function onAddAsMemberChanged(enabled) {
     return;
   }
 
+  form.value.reservationId = null;
+
   if (!churchOptions.value.length) {
     loadChurches();
   }
@@ -235,12 +338,20 @@ function onAddAsMemberChanged(enabled) {
 }
 
 async function onShow() {
-  await loadMembers();
+  if (!isEditingGuest.value) {
+    await loadMembers();
+  }
+
   if (props.mode === "edit" && props.participant) {
+    const reservationId = props.participant.reservationId
+      ? Number(props.participant.reservationId)
+      : null;
+    originalReservationId.value = reservationId;
     form.value = {
-      memberId: props.participant.memberId,
+      memberId: props.participant.memberId || null,
       addAsMember: false,
       churchId: null,
+      reservationId,
       firstName: props.participant.firstName || "",
       lastName: props.participant.lastName || "",
       fullName: props.participant.fullName || "",
@@ -274,16 +385,39 @@ function buildPayload() {
     };
   }
 
-  return {
+  const payload = {
     fullName: form.value.fullName,
     email: form.value.email,
     phone: form.value.phone
   };
+
+  if (isEditingGuest.value && form.value.reservationId) {
+    if (Number(form.value.reservationId) !== Number(originalReservationId.value)) {
+      payload.transferReservationId = Number(form.value.reservationId);
+    }
+  } else if (props.mode === "create" && form.value.reservationId) {
+    payload.reservationId = Number(form.value.reservationId);
+  }
+
+  return payload;
 }
 
 async function submit() {
   const valid = await formRef.value?.validate();
   if (!valid) return;
+
+  if (showGuestListSelect.value && !form.value.reservationId && isEditingGuest.value) {
+    $q.notify({ type: "negative", message: "Select a guest list." });
+    return;
+  }
+
+  if (guestListConflictLabel.value && isMovingGuestList.value) {
+    $q.notify({
+      type: "negative",
+      message: `${form.value.fullName || "This guest"} already exists on ${guestListConflictLabel.value}.`
+    });
+    return;
+  }
 
   saving.value = true;
   try {
@@ -293,9 +427,19 @@ async function submit() {
         ? await api.post(`/events/${props.eventId}/participants`, payload)
         : await api.put(`/events/${props.eventId}/participants/${props.participant.id}`, payload);
 
+    const moved =
+      isEditingGuest.value &&
+      form.value.reservationId != null &&
+      Number(form.value.reservationId) !== Number(originalReservationId.value);
+
     $q.notify({
       type: "positive",
-      message: props.mode === "create" ? "Participant added." : "Participant updated."
+      message:
+        props.mode === "create"
+          ? "Participant added."
+          : moved
+            ? "Participant updated and moved to the selected guest list."
+            : "Participant updated."
     });
     emit("saved", data);
     emit("update:modelValue", false);
@@ -322,5 +466,15 @@ watch(
   font-size: 0.75rem;
   line-height: 1.45;
   color: #8b93a1;
+}
+
+.event-participant-form__warning {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff4e5;
+  color: #8a5a00;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 </style>
