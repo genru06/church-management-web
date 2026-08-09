@@ -489,21 +489,35 @@
           </template>
           <template #body-cell-registrationPaid="props">
             <q-td :props="props">
-              <q-badge
-                :color="props.row.registrationPaid ? 'positive' : 'warning'"
-                :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
-              />
-              <q-btn
-                v-if="!props.row.registrationPaid"
-                flat
-                dense
-                no-caps
-                size="sm"
-                color="primary"
-                label="Pay link"
-                class="q-ml-xs"
-                @click="copyPayLink(props.row)"
-              />
+              <div class="event-dashboard__paid-cell">
+                <q-badge
+                  :color="props.row.registrationPaid ? 'positive' : 'warning'"
+                  :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
+                />
+                <template v-if="!props.row.registrationPaid">
+                  <q-btn
+                    dense
+                    unelevated
+                    no-caps
+                    size="sm"
+                    color="positive"
+                    icon="payments"
+                    label="Mark As Paid"
+                    :loading="markingPaidId === props.row.id"
+                    :disable="!!markingPaidId"
+                    @click="markAsPaid(props.row)"
+                  />
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    size="sm"
+                    color="primary"
+                    label="Pay link"
+                    @click="copyPayLink(props.row)"
+                  />
+                </template>
+              </div>
             </q-td>
           </template>
           <template #body-cell-actions="props">
@@ -912,6 +926,7 @@ const participantDialogOpen = ref(false);
 const participantMode = ref("create");
 const editingParticipant = ref(null);
 const uploadingParticipants = ref(false);
+const markingPaidId = ref(null);
 const uploadInputRef = ref(null);
 const templateDialogOpen = ref(false);
 const templateScope = ref("general");
@@ -1084,6 +1099,34 @@ function copyPayLink(participant) {
   const url = `${window.location.origin}/events/${eventId}/register/${participant.id}`;
   navigator.clipboard?.writeText(url);
   $q.notify({ type: "info", message: "Payment link copied to clipboard." });
+}
+
+async function markAsPaid(participant) {
+  if (!participant?.id || markingPaidId.value || participant.registrationPaid) return;
+
+  const amount = Number(dashboard.value.event?.registrationFee || 0);
+  if (!(amount > 0)) {
+    $q.notify({ type: "warning", message: "This event has no registration fee." });
+    return;
+  }
+
+  markingPaidId.value = participant.id;
+  try {
+    await api.post(`/events/${eventId}/participants/${participant.id}/pay`, { amount });
+    $q.notify({
+      type: "positive",
+      message: `${participant.fullName || "Participant"} marked as paid.`
+    });
+    await loadDashboard();
+  } catch (err) {
+    const message = err?.response?.data?.message || err?.message || "Failed to mark participant as paid.";
+    $q.notify({
+      type: "negative",
+      message: Array.isArray(message) ? message[0] : message
+    });
+  } finally {
+    markingPaidId.value = null;
+  }
 }
 
 function copyRegistrationLink() {
@@ -1720,6 +1763,13 @@ onMounted(loadDashboard);
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.event-dashboard__paid-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .event-dashboard__reservation-total {

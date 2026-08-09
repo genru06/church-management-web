@@ -144,10 +144,25 @@
 
             <template #body-cell-registrationPaid="props">
               <q-td :props="props">
-                <q-badge
-                  :color="props.row.registrationPaid ? 'positive' : 'warning'"
-                  :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
-                />
+                <div class="participants-view-dialog__paid-cell">
+                  <q-badge
+                    :color="props.row.registrationPaid ? 'positive' : 'warning'"
+                    :label="props.row.registrationPaid ? 'Paid' : 'Unpaid'"
+                  />
+                  <q-btn
+                    v-if="!props.row.registrationPaid"
+                    dense
+                    unelevated
+                    no-caps
+                    size="sm"
+                    color="positive"
+                    icon="payments"
+                    label="Mark As Paid"
+                    :loading="markingPaidId === props.row.id"
+                    :disable="!!markingPaidId"
+                    @click.stop="markAsPaid(props.row)"
+                  />
+                </div>
               </q-td>
             </template>
 
@@ -1159,6 +1174,7 @@ const manualLinkLoading = ref(false);
 const manualLinking = ref(false);
 const manualLinkingId = ref(null);
 const deletingParticipantId = ref(null);
+const markingPaidId = ref(null);
 const manualAddAsMember = ref(false);
 const manualAddChurchId = ref(null);
 const manualAddFirstName = ref("");
@@ -1736,6 +1752,36 @@ async function deleteParticipant(participant) {
     });
   } finally {
     deletingParticipantId.value = null;
+  }
+}
+
+async function markAsPaid(participant) {
+  if (!props.eventId || !participant?.id || markingPaidId.value || participant.registrationPaid) return;
+
+  const amount = Number(props.event?.registrationFee || 0);
+  if (!(amount > 0)) {
+    $q.notify({ type: "warning", message: "This event has no registration fee." });
+    return;
+  }
+
+  markingPaidId.value = participant.id;
+  try {
+    const { data } = await api.post(`/events/${props.eventId}/participants/${participant.id}/pay`, {
+      amount
+    });
+    $q.notify({
+      type: "positive",
+      message: `${participant.fullName || "Participant"} marked as paid.`
+    });
+    emit("updated", data);
+  } catch (err) {
+    const message = err?.response?.data?.message || err?.message || "Failed to mark participant as paid.";
+    $q.notify({
+      type: "negative",
+      message: Array.isArray(message) ? message[0] : message
+    });
+  } finally {
+    markingPaidId.value = null;
   }
 }
 
@@ -2659,6 +2705,13 @@ watch(
 .participants-view-dialog__manual-church-field {
   position: relative;
   z-index: 2;
+}
+
+.participants-view-dialog__paid-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .participants-view-dialog__actions-cell {
