@@ -237,6 +237,16 @@
               label="Mark present"
               @click="manualCheckIn(props.row)"
             />
+            <q-btn
+              v-else
+              flat
+              dense
+              no-caps
+              size="sm"
+              color="negative"
+              label="Revoke as present"
+              @click="revokePresent(props.row)"
+            />
           </q-td>
         </template>
 
@@ -452,6 +462,17 @@ async function manualCheckIn(participant) {
     $q.notify({ type: "positive", message: `${participant.fullName} marked present.` });
   } catch {
     $q.notify({ type: "negative", message: "Failed to check in participant." });
+  }
+}
+
+async function revokePresent(participant) {
+  try {
+    const { data } = await api.post(`/events/${eventId}/checkin/${participant.id}/cancel`);
+    const index = participants.value.findIndex((p) => p.id === participant.id);
+    if (index >= 0) participants.value[index] = data;
+    $q.notify({ type: "positive", message: `${participant.fullName} marked absent.` });
+  } catch {
+    $q.notify({ type: "negative", message: "Failed to revoke attendance." });
   }
 }
 
