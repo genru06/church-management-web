@@ -12,14 +12,15 @@ export function tagsForMemberApi(tags = []) {
   return (tags || []).filter((tag) => !isLifeGroupFilterTag(tag));
 }
 
-export function getMembersPrintUrl({ tags, lifeGroupId } = {}) {
+export function getMembersPrintUrl({ tags, lifeGroupId, networkOnly = false } = {}) {
   const params = new URLSearchParams();
   (tags || []).forEach((tag) => params.append("tag", tag));
   if (lifeGroupId != null && lifeGroupId !== "") {
     params.set("lifeGroupId", String(lifeGroupId));
   }
   const query = params.toString();
-  return query ? `/members/print?${query}` : "/members/print";
+  const path = networkOnly ? "/lg-network-churches/members/print" : "/members/print";
+  return query ? `${path}?${query}` : path;
 }
 
 function sortMembers(rows) {

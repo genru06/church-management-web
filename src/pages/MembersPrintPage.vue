@@ -21,7 +21,7 @@
 
     <article v-if="!loading" class="members-print-page__document">
       <header class="members-print-page__header">
-        <h1 class="members-print-page__title">Member List</h1>
+        <h1 class="members-print-page__title">{{ pageTitle }}</h1>
         <p v-if="lifeGroupFilterLabel" class="members-print-page__filter">
           LifeGroup: {{ lifeGroupFilterLabel }}
         </p>
@@ -89,6 +89,11 @@ import {
   hasLifeGroupFilterTag,
   tagsForMemberApi
 } from "src/utils/memberPrint";
+import { LG_NETWORK_CHURCH_TAG, LG_NETWORK_MEMBERS_PATH } from "src/utils/churchTags";
+
+const props = defineProps({
+  networkOnly: { type: Boolean, default: false }
+});
 
 const $q = useQuasar();
 const route = useRoute();
@@ -164,11 +169,16 @@ const lifeGroupFilterLabel = computed(() => {
   return lifeGroupName.value || "Selected lifegroup";
 });
 
+const pageTitle = computed(() =>
+  props.networkOnly ? "LG Network Church Member List" : "Member List"
+);
+const listPath = computed(() => (props.networkOnly ? LG_NETWORK_MEMBERS_PATH : "/members"));
+
 function goBack() {
   const query = {};
   if (tagFilter.value.length) query.tag = tagFilter.value;
   if (isLifeGroupPrint.value) query.lifeGroupId = lifeGroupId.value;
-  router.push({ path: "/members", query });
+  router.push({ path: listPath.value, query });
 }
 
 function printSheet() {
@@ -205,7 +215,7 @@ async function loadPrintSheet() {
     if (hasLifeGroupFilterTag(tagFilter.value) && !lifeGroupId.value) {
       $q.notify({ type: "warning", message: "Select a lifegroup before printing." });
       router.push({
-        path: "/members",
+        path: listPath.value,
         query: tagFilter.value.length ? { tag: tagFilter.value } : {}
       });
       return;
@@ -215,6 +225,7 @@ async function loadPrintSheet() {
     const apiTags = tagsForMemberApi(tagFilter.value);
     if (apiTags.length) params.tag = apiTags;
     if (lifeGroupId.value) params.lifeGroupId = lifeGroupId.value;
+    if (props.networkOnly) params.churchTag = LG_NETWORK_CHURCH_TAG;
 
     const requests = [
       api.get("/tags"),
@@ -240,7 +251,7 @@ async function loadPrintSheet() {
     await loadQrCodes(uniqueMembers);
   } catch {
     $q.notify({ type: "negative", message: "Failed to load member list for printing." });
-    router.push("/members");
+    router.push(listPath.value);
   } finally {
     loading.value = false;
   }

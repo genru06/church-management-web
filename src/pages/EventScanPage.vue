@@ -19,6 +19,15 @@
             Pre-registration is not required — walk-ins are checked in automatically.
           </span>
         </p>
+        <q-banner
+          v-if="hasRegistrationFee"
+          dense
+          rounded
+          class="event-scan-page__paid-note bg-warning text-dark q-mt-sm"
+        >
+          This is a paid event ({{ formatCurrency(event.registrationFee) }}). Unpaid
+          participants will not be checked in unless you override.
+        </q-banner>
       </div>
     </section>
 
@@ -87,14 +96,52 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="unpaidDialogOpen" persistent>
+      <q-card class="entity-dialog event-scan-page__unpaid-dialog">
+        <q-card-section class="text-center">
+          <q-icon name="payments" color="negative" size="48px" />
+          <q-badge color="negative" label="Unpaid" class="q-mt-sm" />
+          <h3 class="q-mt-md q-mb-xs">{{ unpaidParticipant?.fullName || "Participant" }}</h3>
+          <p class="event-scan-page__unpaid-message">{{ unpaidMessage }}</p>
+          <p class="event-scan-page__unpaid-note">
+            Attendance was <strong>not</strong> recorded.
+            <span v-if="hasRegistrationFee">
+              Registration fee: {{ formatCurrency(unpaidParticipant?.registrationAmount || event?.registrationFee) }}.
+            </span>
+            Override only if payment is collected or approved at the door.
+          </p>
+        </q-card-section>
+        <q-card-actions vertical align="stretch" class="q-px-md q-pb-md">
+          <q-btn
+            unelevated
+            no-caps
+            color="negative"
+            label="Override & check in"
+            class="q-mb-sm"
+            :loading="overriding"
+            @click="overrideUnpaidCheckIn"
+          />
+          <q-btn
+            flat
+            no-caps
+            color="grey-8"
+            label="Don't check in"
+            :disable="overriding"
+            @click="closeUnpaidDialog"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { eventHasRegistrationFee } from "src/utils/participantTags";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -110,10 +157,17 @@ const scanError = ref("");
 const manualPayload = ref("");
 const checkingIn = ref(false);
 const cancelling = ref(false);
+const overriding = ref(false);
 const resultDialogOpen = ref(false);
 const checkInResult = ref(null);
 const alertDialogOpen = ref(false);
 const alertMessage = ref("");
+const unpaidDialogOpen = ref(false);
+const unpaidMessage = ref("");
+const unpaidParticipant = ref(null);
+const pendingCheckInBody = ref(null);
+
+const hasRegistrationFee = computed(() => eventHasRegistrationFee(event.value));
 
 let scanner = null;
 let scanBusy = false;
@@ -128,17 +182,29 @@ function extractErrorMessage(err, fallback) {
   return fallback;
 }
 
-function isNotRegisteredError(err) {
+function getErrorPayload(err) {
   const data = err?.response?.data;
-  const message = data?.message;
-  if (message?.code === "NOT_REGISTERED") return true;
-  if (data?.code === "NOT_REGISTERED") return true;
+  if (data && typeof data.message === "object" && data.message) return data.message;
+  return data || {};
+}
+
+function isNotRegisteredError(err) {
+  const payload = getErrorPayload(err);
+  if (payload?.code === "NOT_REGISTERED") return true;
   const text = extractErrorMessage(err, "");
   return /not registered to attend/i.test(text);
 }
 
+function isUnpaidError(err) {
+  return getErrorPayload(err)?.code === "UNPAID";
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value || 0);
+}
+
 function isDialogOpen() {
-  return resultDialogOpen.value || alertDialogOpen.value;
+  return resultDialogOpen.value || alertDialogOpen.value || unpaidDialogOpen.value;
 }
 
 async function restartScanner() {
@@ -165,12 +231,48 @@ async function showCheckInResult(data) {
   resultDialogOpen.value = true;
 }
 
-async function checkInMemberById(memberId) {
+function showUnpaidDialog(err) {
+  const payload = getErrorPayload(err);
+  unpaidParticipant.value = payload.participant || null;
+  unpaidMessage.value =
+    payload.message ||
+    extractErrorMessage(err, "This participant has not paid the registration fee.");
+  unpaidDialogOpen.value = true;
+}
+
+async function submitCheckIn(body, { overrideUnpaid = false } = {}) {
+  pendingCheckInBody.value = body;
   const { data } = await api.post(`/events/${eventId}/checkin`, {
+    ...body,
+    ...(overrideUnpaid ? { overrideUnpaid: true } : {})
+  });
+  await showCheckInResult(data);
+}
+
+async function handleCheckInError(err, fallback) {
+  if (isUnpaidError(err)) {
+    showUnpaidDialog(err);
+    return;
+  }
+  if (isNotRegisteredError(err)) {
+    alertMessage.value = extractErrorMessage(
+      err,
+      `This member is not registered to attend this ${event.value?.name || "event"}.`
+    );
+    alertDialogOpen.value = true;
+    return;
+  }
+  $q.notify({
+    type: "negative",
+    message: extractErrorMessage(err, fallback)
+  });
+}
+
+async function checkInMemberById(memberId) {
+  await submitCheckIn({
     type: "manual",
     memberId
   });
-  await showCheckInResult(data);
 }
 
 async function processPayload(rawText) {
@@ -193,12 +295,11 @@ async function processPayload(rawText) {
         $q.notify({ type: "negative", message: "Invalid member QR code." });
         return;
       }
-      const { data } = await api.post(`/events/${eventId}/checkin`, {
+      await submitCheckIn({
         type: "member",
         memberId,
         token
       });
-      await showCheckInResult(data);
       return;
     }
 
@@ -213,29 +314,16 @@ async function processPayload(rawText) {
       return;
     }
 
-    const { data } = await api.post(`/events/${eventId}/checkin`, {
+    await submitCheckIn({
       participantId,
       token
     });
-
-    await showCheckInResult(data);
   } catch (err) {
     if (err instanceof SyntaxError) {
       $q.notify({ type: "negative", message: "Invalid or unreadable QR code." });
       return;
     }
-    if (isNotRegisteredError(err)) {
-      alertMessage.value = extractErrorMessage(
-        err,
-        `This member is not registered to attend this ${event.value?.name || "event"}.`
-      );
-      alertDialogOpen.value = true;
-      return;
-    }
-    $q.notify({
-      type: "negative",
-      message: extractErrorMessage(err, "Failed to record attendance.")
-    });
+    await handleCheckInError(err, "Failed to record attendance.");
   } finally {
     scanBusy = false;
   }
@@ -267,18 +355,7 @@ async function submitManual() {
     await checkInMemberById(memberId);
     manualPayload.value = "";
   } catch (err) {
-    if (isNotRegisteredError(err)) {
-      alertMessage.value = extractErrorMessage(
-        err,
-        `This member is not registered to attend this ${event.value?.name || "event"}.`
-      );
-      alertDialogOpen.value = true;
-    } else {
-      $q.notify({
-        type: "negative",
-        message: extractErrorMessage(err, "Failed to check in member.")
-      });
-    }
+    await handleCheckInError(err, "Failed to check in member.");
   } finally {
     checkingIn.value = false;
   }
@@ -292,6 +369,31 @@ async function closeResultDialog() {
 async function closeAlertDialog() {
   alertDialogOpen.value = false;
   await ensureScannerReady();
+}
+
+async function closeUnpaidDialog() {
+  unpaidDialogOpen.value = false;
+  unpaidParticipant.value = null;
+  unpaidMessage.value = "";
+  pendingCheckInBody.value = null;
+  await ensureScannerReady();
+}
+
+async function overrideUnpaidCheckIn() {
+  const body = pendingCheckInBody.value;
+  if (!body || overriding.value) return;
+
+  overriding.value = true;
+  try {
+    await submitCheckIn(body, { overrideUnpaid: true });
+    unpaidDialogOpen.value = false;
+    unpaidParticipant.value = null;
+    unpaidMessage.value = "";
+  } catch (err) {
+    await handleCheckInError(err, "Failed to override unpaid check-in.");
+  } finally {
+    overriding.value = false;
+  }
 }
 
 async function cancelAttendance() {
@@ -380,6 +482,30 @@ onUnmounted(stopScanner);
     font-size: 0.8rem;
     color: #6b7280;
   }
+}
+
+.event-scan-page__paid-note {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.event-scan-page__unpaid-dialog {
+  p {
+    margin: 0;
+  }
+}
+
+.event-scan-page__unpaid-message {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c62828;
+}
+
+.event-scan-page__unpaid-note {
+  margin-top: 8px !important;
+  font-size: 0.8rem;
+  color: #5f6b7a;
+  line-height: 1.4;
 }
 
 .event-scan-page__reader {

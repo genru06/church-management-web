@@ -134,6 +134,7 @@ export const NAV_ITEMS = [
   { label: "Dashboard", to: "/dashboard", icon: "dashboard", page: "dashboard" },
   { label: "Members", to: "/members", icon: "badge", page: "members" },
   { label: "Churches", to: "/churches", icon: "church", page: "churches" },
+  { label: "LG Network Churches", to: "/lg-network-churches", icon: "account_tree", page: "churches" },
   { label: "LifeGroups", to: "/lifegroups", icon: "hub", page: "lifegroups" },
   { label: "Events", to: "/events", icon: "event", page: "events" },
   { label: "Operations", to: "/operations", icon: "account_balance", page: "operations" },

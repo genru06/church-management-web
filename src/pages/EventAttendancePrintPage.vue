@@ -45,6 +45,7 @@
             <th>First Name</th>
             <th>Church</th>
             <th>LifeGroup</th>
+            <th v-if="hasRegistrationFee">Paid</th>
           </tr>
         </thead>
         <tbody>
@@ -61,6 +62,7 @@
             <td>{{ participant.firstName || "—" }}</td>
             <td>{{ participant.churchName || participant.reservationLabel || "—" }}</td>
             <td>{{ participant.lifegroupName || "—" }}</td>
+            <td v-if="hasRegistrationFee">{{ participant.registrationPaid ? "Paid" : "Unpaid" }}</td>
           </tr>
         </tbody>
       </table>
@@ -76,6 +78,7 @@ import { api } from "src/boot/axios";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { formatEventTime } from "src/utils/eventTime";
 import {
+  eventHasRegistrationFee,
   filterParticipantsByAttendance,
   filterParticipantsByGroup,
   filterParticipantsBySearch,
@@ -138,6 +141,7 @@ const loading = ref(false);
 const event = ref(null);
 const allParticipants = ref([]);
 const qrByParticipant = ref({});
+const hasRegistrationFee = computed(() => eventHasRegistrationFee(event.value));
 
 const participants = computed(() => {
   let rows = [...allParticipants.value];
@@ -165,8 +169,13 @@ const participants = computed(() => {
     });
   }
 
-  rows = filterParticipantsByTags(rows, tagFilter.value, { exclude: excludeTags.value });
-  rows = filterParticipantsBySearch(rows, searchFilter.value);
+  rows = filterParticipantsByTags(rows, tagFilter.value, {
+    exclude: excludeTags.value,
+    hasRegistrationFee: hasRegistrationFee.value
+  });
+  rows = filterParticipantsBySearch(rows, searchFilter.value, {
+    hasRegistrationFee: hasRegistrationFee.value
+  });
   rows = filterParticipantsByAttendance(rows, attendanceStatus.value);
 
   return rows.sort((a, b) => {

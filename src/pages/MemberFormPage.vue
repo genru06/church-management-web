@@ -65,7 +65,7 @@
             </div>
           </div>
           <div class="col-12 row justify-end q-gutter-sm">
-            <q-btn flat color="grey-8" icon="arrow_back" label="Cancel" to="/members" />
+            <q-btn flat color="grey-8" icon="arrow_back" label="Cancel" :to="listPath" />
             <q-btn
               color="primary"
               :icon="mode === 'create' ? 'person_add' : 'save'"
@@ -80,14 +80,15 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "src/boot/axios";
 import { DEFAULT_CITY_ID } from "../mocks/data";
 import { applyDefaultCity, ensureDefaultCityOption, toCityOption } from "src/utils/defaultCity";
 import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
+import { membersListPathFromQuery } from "src/utils/churchTags";
 
 const props = defineProps({
   mode: { type: String, default: "create" },
@@ -95,6 +96,8 @@ const props = defineProps({
 });
 const $q = useQuasar();
 const router = useRouter();
+const route = useRoute();
+const listPath = computed(() => membersListPathFromQuery(route.query));
 const cityOptions = ref([]);
 const allChurchOptions = ref([]);
 const tagOptions = ref([]);
@@ -152,7 +155,7 @@ function submitForm() {
     if (props.mode === "create") await api.post("/members", payload);
     else await api.put(`/members/${props.id}`, payload);
     $q.notify({ type: "positive", message: "Member saved." });
-    await router.push("/members");
+    await router.push(listPath.value);
   });
 }
 

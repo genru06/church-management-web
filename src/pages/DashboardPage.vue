@@ -91,6 +91,7 @@ const router = useRouter();
 const stats = ref({
   totalMembers: 0,
   totalChurches: 0,
+  totalNetworkChurches: 0,
   totalLifeGroups: 0,
   totalKids: 0
 });
@@ -102,6 +103,13 @@ const lifeGroupDialogOpen = ref(false);
 const cards = computed(() => [
   { label: "Total Members", value: stats.value.totalMembers, icon: "badge", color: "primary", to: "/members" },
   { label: "Total Churches", value: stats.value.totalChurches, icon: "church", color: "secondary", to: "/churches" },
+  {
+    label: "LG Network Churches",
+    value: stats.value.totalNetworkChurches,
+    icon: "account_tree",
+    color: "teal",
+    to: "/lg-network-churches"
+  },
   { label: "Total LifeGroups", value: stats.value.totalLifeGroups, icon: "hub", color: "accent", to: "/lifegroups" },
   {
     label: "Total Kids",
@@ -151,6 +159,7 @@ async function loadStats() {
   stats.value = {
     totalMembers: data.totalMembers,
     totalChurches: data.totalChurches,
+    totalNetworkChurches: data.totalNetworkChurches || 0,
     totalLifeGroups: data.totalLifeGroups,
     totalKids: data.totalKids
   };

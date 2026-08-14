@@ -203,7 +203,8 @@ import AppSelect from "src/components/AppSelect.vue";
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   mode: { type: String, default: "create" },
-  memberId: { type: [String, Number], default: null }
+  memberId: { type: [String, Number], default: null },
+  churchTag: { type: String, default: null }
 });
 
 const emit = defineEmits(["update:modelValue", "saved"]);
@@ -257,7 +258,8 @@ function resetForm() {
 }
 
 async function loadChurches() {
-  const { data } = await api.get("/churches");
+  const params = props.churchTag ? { tag: props.churchTag } : {};
+  const { data } = await api.get("/churches", { params });
   allChurchOptions.value = sortChurchesMainFirst(
     data.map((church) => ({
       label: getChurchDisplayName(church),

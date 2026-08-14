@@ -1,9 +1,15 @@
 <template>
   <q-page class="entity-page">
     <header class="entity-page__header">
-      <div class="entity-page__heading">
+      <div class="entity-page__heading event-dashboard__heading">
         <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push('/events')" />
         <h1 class="entity-page__title">{{ dashboard.event?.name || "Event dashboard" }}</h1>
+        <PageMetricBar
+          v-if="dashboard.event"
+          :total="eventParticipantTotal"
+          :adults="eventAdultCount"
+          :kids="eventKidsCount"
+        />
       </div>
       <div class="entity-page__actions">
         <q-btn
@@ -62,15 +68,14 @@
             @click="openParticipantsView('all')"
           >
             <span class="event-stat-card__label">Participants</span>
-            <span class="event-stat-card__value">{{ participantsWithReservedTotal }}</span>
-            <span
-              v-if="dashboard.stats.kidsCount || reservationTotal"
-              class="event-stat-card__breakdown"
-            >
-              <span v-if="reservationTotal">{{ dashboard.stats.participantCount }} registered</span>
-              <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.adultCount }} adults</span>
-              <span v-if="dashboard.stats.kidsCount">{{ dashboard.stats.kidsCount }} kids</span>
-              <span v-if="reservationTotal">{{ reservationTotal }} reserved</span>
+            <PageMetricBar
+              compact
+              :total="eventParticipantTotal"
+              :adults="eventAdultCount"
+              :kids="eventKidsCount"
+            />
+            <span v-if="reservationTotal" class="event-stat-card__breakdown">
+              <span>{{ reservationTotal }} reserved</span>
             </span>
             <span class="event-stat-card__hint">View list</span>
           </button>
@@ -109,15 +114,26 @@
         </div>
         <div v-if="hasRegistrationFee" class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
-            <span class="event-stat-card__label">Registration</span>
-            <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.registrationCollected) }}</span>
+            <span class="event-stat-card__label">Registration fee</span>
+            <span class="event-stat-card__value">{{ formatCurrency(dashboard.event.registrationFee) }}</span>
           </div>
         </div>
         <div v-if="showTotalCollected" class="col-6 col-sm-4 col-md-3 col-lg-2">
-          <div class="event-stat-card">
-            <span class="event-stat-card__label">Total collected</span>
+          <button
+            type="button"
+            class="event-stat-card event-stat-card--clickable"
+            @click="openParticipantsView('paid')"
+          >
+            <span class="event-stat-card__label">
+              Total collected
+              <span class="event-stat-card__label-pct">{{ collectionRate }}%</span>
+            </span>
             <span class="event-stat-card__value">{{ formatCurrency(dashboard.stats.totalCollected) }}</span>
-          </div>
+            <span class="event-stat-card__expected">
+              Expected {{ formatCurrency(expectedCollection) }}
+            </span>
+            <span class="event-stat-card__hint">View paid participants</span>
+          </button>
         </div>
       </section>
 
@@ -475,12 +491,12 @@
           </template>
           <template #body-cell-tags="props">
             <q-td :props="props">
-              <div v-if="props.row.tags?.length" class="event-dashboard__tags">
+              <div v-if="displayTags(props.row).length" class="event-dashboard__tags">
                 <q-badge
-                  v-for="tag in props.row.tags"
+                  v-for="tag in displayTags(props.row)"
                   :key="tag"
-                  outline
-                  color="grey-7"
+                  :outline="!isPaymentTag(tag)"
+                  :color="tagColor(tag)"
                   :label="tag"
                 />
               </div>
@@ -890,6 +906,7 @@ import EventParticipantFormDialog from "src/components/EventParticipantFormDialo
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
 import EventRegistrationQrDialog from "src/components/EventRegistrationQrDialog.vue";
 import EventParticipantsViewDialog from "src/components/EventParticipantsViewDialog.vue";
+import PageMetricBar from "src/components/PageMetricBar.vue";
 import AppSelect from "src/components/AppSelect.vue";
 import {
   downloadEventParticipantBulkTemplate,
@@ -902,7 +919,11 @@ import {
 } from "src/utils/eventRegistration";
 import { formatEventTime } from "src/utils/eventTime";
 import {
+  filterParticipantsBySearch,
   filterParticipantsByTags,
+  isPaymentTag,
+  participantTagNames,
+  paymentTagColor,
   uniqueParticipantTags
 } from "src/utils/participantTags";
 
@@ -971,8 +992,12 @@ const participantTagModeOptions = [
   { label: "Exclude", value: "exclude" }
 ];
 
+const participantTagNameOptions = computed(() => ({
+  hasRegistrationFee: Number(dashboard.value.event?.registrationFee || 0) > 0
+}));
+
 const participantTagOptions = computed(() =>
-  uniqueParticipantTags(dashboard.value.participants).map((tag) => ({
+  uniqueParticipantTags(dashboard.value.participants, participantTagNameOptions.value).map((tag) => ({
     label: tag,
     value: tag
   }))
@@ -980,9 +1005,18 @@ const participantTagOptions = computed(() =>
 
 const tagFilteredParticipants = computed(() =>
   filterParticipantsByTags(dashboard.value.participants, participantTagFilter.value, {
-    exclude: participantTagMode.value === "exclude"
+    exclude: participantTagMode.value === "exclude",
+    hasRegistrationFee: participantTagNameOptions.value.hasRegistrationFee
   })
 );
+
+function displayTags(participant) {
+  return participantTagNames(participant, participantTagNameOptions.value);
+}
+
+function tagColor(tag) {
+  return paymentTagColor(tag) || "grey-7";
+}
 
 const templateScopeOptions = [
   { label: "General", value: "general" },
@@ -1005,9 +1039,13 @@ const reservationTotal = computed(() =>
   (dashboard.value.reservations || []).reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
 );
 
-const participantsWithReservedTotal = computed(
-  () => Number(dashboard.value.stats?.participantCount || 0) + reservationTotal.value
-);
+const eventParticipantTotal = computed(() => Number(dashboard.value.stats?.participantCount || 0));
+const eventKidsCount = computed(() => Number(dashboard.value.stats?.kidsCount || 0));
+const eventAdultCount = computed(() => {
+  const adults = dashboard.value.stats?.adultCount;
+  if (adults != null && adults !== "") return Number(adults || 0);
+  return Math.max(eventParticipantTotal.value - eventKidsCount.value, 0);
+});
 
 const canManageReservations = computed(
   () => auth.canDo("action.events.edit") || auth.canDo("action.events.manage_participants")
@@ -1067,6 +1105,24 @@ const hasRegistrationFee = computed(() => Number(dashboard.value.event?.registra
 const showTotalCollected = computed(
   () => hasRegistrationFee.value || !!dashboard.value.event?.allowPledges
 );
+const expectedCollection = computed(() => {
+  const fee = Number(dashboard.value.event?.registrationFee || 0);
+  const registrationExpected = (dashboard.value.participants || []).reduce((sum, participant) => {
+    const amount = Number(participant.registrationAmount || 0);
+    if (amount > 0) return sum + amount;
+    return fee > 0 ? sum + fee : sum;
+  }, 0);
+  const pledgesExpected = (dashboard.value.pledges || []).reduce(
+    (sum, pledge) => sum + Number(pledge.amount || 0),
+    0
+  );
+  return registrationExpected + pledgesExpected;
+});
+const collectionRate = computed(() => {
+  const expected = expectedCollection.value;
+  if (!expected) return 0;
+  return Math.round((Number(dashboard.value.stats?.totalCollected || 0) / expected) * 100);
+});
 
 const pledgeColumns = [
   { name: "pledgerName", label: "Pledger", field: "pledgerName", align: "left", sortable: true },
@@ -1150,28 +1206,7 @@ function openParticipantsView(mode = "all") {
 }
 
 function filterParticipants(rows, terms) {
-  const needle = String(terms || "")
-    .trim()
-    .toLowerCase();
-  if (!needle) return rows;
-
-  return rows.filter((row) => {
-    const haystack = [
-      row.firstName,
-      row.lastName,
-      row.fullName,
-      row.churchName,
-      row.lifegroupName,
-      row.email,
-      row.phone,
-      ...(Array.isArray(row.tags) ? row.tags : [])
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(needle);
-  });
+  return filterParticipantsBySearch(rows, terms, participantTagNameOptions.value);
 }
 
 async function loadChurches() {
@@ -1627,8 +1662,19 @@ onMounted(loadDashboard);
 </script>
 
 <style scoped lang="scss">
+.event-dashboard__heading {
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .event-dashboard__stats {
   margin-top: 4px;
+  align-items: stretch;
+
+  > [class*="col-"] {
+    display: flex;
+  }
 }
 
 .event-stat-card {
@@ -1638,10 +1684,16 @@ onMounted(loadDashboard);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-height: 64px;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 118px;
+  height: 100%;
   width: 100%;
   text-align: left;
+
+  .page-metric-bar {
+    margin-top: 2px;
+  }
 }
 
 .event-stat-card--clickable {
@@ -1684,12 +1736,28 @@ onMounted(loadDashboard);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #8b93a1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.event-stat-card__label-pct {
+  letter-spacing: 0.02em;
+  color: #1976d2;
 }
 
 .event-stat-card__value {
   font-size: 1.1rem;
   font-weight: 600;
   color: #1a1a2e;
+}
+
+.event-stat-card__expected {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8b93a1;
+  line-height: 1.25;
 }
 
 .event-dashboard__section-header {

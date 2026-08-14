@@ -19,7 +19,7 @@
           </div>
         </div>
         <div class="member-profile__actions">
-          <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" to="/members" />
+          <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" :to="listPath" />
           <q-btn dense unelevated no-caps color="primary" icon="edit" label="Edit" @click="openEditDialog" />
         </div>
       </header>
@@ -62,6 +62,7 @@
       v-model="formDialogOpen"
       mode="edit"
       :member-id="id"
+      :church-tag="networkChurchTag"
       @saved="onMemberSaved"
     />
   </q-page>
@@ -69,13 +70,19 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "src/boot/axios";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import { generateMemberQrDataUrl } from "src/utils/memberQr";
+import { membersListPathFromQuery, LG_NETWORK_CHURCH_TAG, LG_NETWORK_MEMBERS_FROM } from "src/utils/churchTags";
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
 const router = useRouter();
+const route = useRoute();
+const listPath = computed(() => membersListPathFromQuery(route.query));
+const networkChurchTag = computed(() =>
+  route.query.from === LG_NETWORK_MEMBERS_FROM ? LG_NETWORK_CHURCH_TAG : null
+);
 const member = ref({});
 const loading = ref(false);
 const formDialogOpen = ref(false);
@@ -161,7 +168,7 @@ onMounted(async () => {
     const { data } = await api.get(`/members/${props.id}`);
     member.value = data;
   } catch {
-    router.push("/members");
+    router.push(listPath.value);
   } finally {
     loading.value = false;
   }

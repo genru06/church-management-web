@@ -1,3 +1,8 @@
+export const PAID_TAG = "Paid";
+export const UNPAID_TAG = "Unpaid";
+
+const PAYMENT_TAG_KEYS = new Set([PAID_TAG.toLowerCase(), UNPAID_TAG.toLowerCase()]);
+
 export function normalizeTagList(value) {
   if (value == null || value === "") return [];
   const raw = Array.isArray(value) ? value : [value];
@@ -20,44 +25,94 @@ export function normalizeTagList(value) {
   return tags;
 }
 
-export function participantTagNames(participant) {
-  return Array.isArray(participant?.tags) ? participant.tags.filter(Boolean).map(String) : [];
+export function eventHasRegistrationFee(value) {
+  if (value === true) return true;
+  if (!value) return false;
+  if (typeof value === "object") {
+    return Number(value.registrationFee || 0) > 0;
+  }
+  return Number(value) > 0;
 }
 
-export function participantHasAnyTag(participant, tags) {
+export function isPaymentTag(tag) {
+  return PAYMENT_TAG_KEYS.has(String(tag || "").toLowerCase());
+}
+
+export function paymentTagColor(tag) {
+  const key = String(tag || "").toLowerCase();
+  if (key === "paid") return "positive";
+  if (key === "unpaid") return "warning";
+  return null;
+}
+
+export function participantPaymentTag(participant) {
+  return participant?.registrationPaid ? PAID_TAG : UNPAID_TAG;
+}
+
+export function participantTagNames(participant, { hasRegistrationFee = false } = {}) {
+  const stored = Array.isArray(participant?.tags) ? participant.tags.filter(Boolean).map(String) : [];
+  if (!hasRegistrationFee) return stored;
+
+  const tags = stored.filter((tag) => !isPaymentTag(tag));
+  tags.push(participantPaymentTag(participant));
+  return tags;
+}
+
+export function participantHasAnyTag(participant, tags, { hasRegistrationFee = false } = {}) {
   const selected = normalizeTagList(tags);
   if (!selected.length) return true;
 
-  const haystack = new Set(participantTagNames(participant).map((tag) => tag.toLowerCase()));
+  const haystack = new Set(
+    participantTagNames(participant, { hasRegistrationFee }).map((tag) => tag.toLowerCase())
+  );
   return selected.some((tag) => haystack.has(tag.toLowerCase()));
 }
 
-export function filterParticipantsByTags(participants, tags, { exclude = false } = {}) {
+export function filterParticipantsByTags(participants, tags, { exclude = false, hasRegistrationFee = false } = {}) {
   const selected = normalizeTagList(tags);
   if (!selected.length) return participants || [];
   return (participants || []).filter((participant) => {
-    const hasTag = participantHasAnyTag(participant, selected);
+    const hasTag = participantHasAnyTag(participant, selected, { hasRegistrationFee });
     return exclude ? !hasTag : hasTag;
   });
 }
 
-export function uniqueParticipantTags(participants) {
+export function uniqueParticipantTags(participants, { hasRegistrationFee = false } = {}) {
   const seen = new Set();
   const tags = [];
 
+  const add = (tag) => {
+    const key = String(tag || "").toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    tags.push(tag);
+  };
+
+  if (hasRegistrationFee) {
+    add(PAID_TAG);
+    add(UNPAID_TAG);
+  }
+
   (participants || []).forEach((participant) => {
-    participantTagNames(participant).forEach((tag) => {
-      const key = tag.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      tags.push(tag);
-    });
+    participantTagNames(participant, { hasRegistrationFee }).forEach(add);
   });
 
-  return tags.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return tags.sort((a, b) => {
+    if (hasRegistrationFee) {
+      const rank = (tag) => {
+        const key = String(tag).toLowerCase();
+        if (key === "paid") return 0;
+        if (key === "unpaid") return 1;
+        return 2;
+      };
+      const diff = rank(a) - rank(b);
+      if (diff !== 0) return diff;
+    }
+    return a.localeCompare(b, undefined, { sensitivity: "base" });
+  });
 }
 
-export function filterParticipantsBySearch(participants, search) {
+export function filterParticipantsBySearch(participants, search, { hasRegistrationFee = false } = {}) {
   const needle = String(search || "")
     .trim()
     .toLowerCase();
@@ -76,7 +131,7 @@ export function filterParticipantsBySearch(participants, search) {
       row.lifegroupName,
       row.email,
       row.phone,
-      ...participantTagNames(row)
+      ...participantTagNames(row, { hasRegistrationFee })
     ]
       .filter(Boolean)
       .join(" ")

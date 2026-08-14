@@ -5,7 +5,7 @@
         <h1 class="entity-page__title">{{ church.name || "Church details" }}</h1>
       </div>
       <div class="entity-page__actions">
-        <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" to="/churches" />
+        <q-btn dense flat no-caps color="grey-8" icon="arrow_back" label="Back" :to="listPath" />
         <q-btn dense unelevated no-caps color="primary" icon="edit" label="Edit" @click="openEditDialog" />
       </div>
     </header>
@@ -128,6 +128,7 @@ import ChurchMembersDialog from "src/components/ChurchMembersDialog.vue";
 import ChurchLifeGroupsDialog from "src/components/ChurchLifeGroupsDialog.vue";
 import ChurchEventsDialog from "src/components/ChurchEventsDialog.vue";
 import { getChurchDisplayName } from "src/utils/churchDisplay";
+import { isLgNetworkChurch } from "src/utils/churchTags";
 
 const props = defineProps({ id: { type: [String, Number], required: true } });
 const router = useRouter();
@@ -148,6 +149,7 @@ const stats = computed(() => church.value.stats || {
 });
 
 const churchDisplayName = computed(() => getChurchDisplayName(church.value));
+const listPath = computed(() => (isLgNetworkChurch(church.value.tags) ? "/lg-network-churches" : "/churches"));
 
 function openEditDialog() {
   formDialogOpen.value = true;

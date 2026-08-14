@@ -42,11 +42,12 @@
               dense
             />
             <div class="text-caption text-grey-6 q-mt-xs">
-              A church can have multiple tags (for example House Church, Daughter Church, Outreach).
+              A church can have multiple tags (for example House Church, Daughter Church, Outreach, LG Network Church).
+              Churches tagged LG Network Church appear on the LG Network Churches page.
             </div>
           </div>
           <div class="col-12 row justify-end q-gutter-sm">
-            <q-btn flat color="grey-8" icon="arrow_back" label="Cancel" to="/churches" />
+            <q-btn flat color="grey-8" icon="arrow_back" label="Cancel" :to="listPath" />
             <q-btn color="primary" :label="mode === 'create' ? 'Create Church' : 'Save Changes'" icon="save" @click="submitForm" />
           </div>
         </q-form>
@@ -56,11 +57,12 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
+import { isLgNetworkChurch } from "src/utils/churchTags";
 
 const props = defineProps({
   mode: { type: String, default: "create" },
@@ -74,6 +76,7 @@ const tagOptions = ref([]);
 const tagsSelectKey = ref(0);
 
 const form = ref({ name: "", shortName: "", address: "", pastorMemberId: null, tags: [] });
+const listPath = computed(() => (isLgNetworkChurch(form.value.tags) ? "/lg-network-churches" : "/churches"));
 
 function submitForm() {
   $q.dialog({
@@ -86,10 +89,12 @@ function submitForm() {
       ...form.value,
       tags: Array.isArray(form.value.tags) ? [...form.value.tags] : []
     };
-    if (props.mode === "create") await api.post("/churches", payload);
-    else await api.put(`/churches/${props.id}`, payload);
+    const { data } =
+      props.mode === "create"
+        ? await api.post("/churches", payload)
+        : await api.put(`/churches/${props.id}`, payload);
     $q.notify({ type: "positive", message: "Church saved." });
-    await router.push("/churches");
+    await router.push(isLgNetworkChurch(data?.tags || payload.tags) ? "/lg-network-churches" : "/churches");
   });
 }
 

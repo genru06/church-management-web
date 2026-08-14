@@ -11,9 +11,10 @@
         <div class="participants-view-dialog__heading">
           <q-btn flat dense round icon="arrow_back" color="grey-7" @click="close" />
           <div>
-            <h2 class="participants-view-dialog__title">Participants</h2>
+            <h2 class="participants-view-dialog__title">{{ dialogTitle }}</h2>
             <p class="participants-view-dialog__subtitle">
-              {{ event?.name || "Event" }} · {{ participants.length }} participant(s)
+              {{ event?.name || "Event" }} · {{ tagFilteredParticipants.length }}
+              {{ paidView ? "paid participant(s)" : "participant(s)" }}
             </p>
           </div>
         </div>
@@ -129,12 +130,12 @@
 
             <template #body-cell-tags="props">
               <q-td :props="props">
-                <div v-if="props.row.tags?.length" class="participants-view-dialog__tags">
+                <div v-if="displayTags(props.row).length" class="participants-view-dialog__tags">
                   <q-badge
-                    v-for="tag in props.row.tags"
+                    v-for="tag in displayTags(props.row)"
                     :key="tag"
-                    outline
-                    color="grey-7"
+                    :outline="!isPaymentTag(tag)"
+                    :color="tagColor(tag)"
                     :label="tag"
                   />
                 </div>
@@ -178,9 +179,11 @@
             <template #no-data>
               <div class="full-width row flex-center q-pa-md text-grey-6">
                 {{
-                  participantFilter || tagFilter.length
-                    ? "No participants match your search."
-                    : "No participants yet."
+                  paidView && !participantFilter
+                    ? "No paid participants yet."
+                    : participantFilter || tagFilter.length
+                      ? "No participants match your search."
+                      : "No participants yet."
                 }}
               </div>
             </template>
@@ -331,12 +334,12 @@
 
                 <template #body-cell-tags="props">
                   <q-td :props="props">
-                    <div v-if="props.row.tags?.length" class="participants-view-dialog__tags">
+                    <div v-if="displayTags(props.row).length" class="participants-view-dialog__tags">
                       <q-badge
-                        v-for="tag in props.row.tags"
+                        v-for="tag in displayTags(props.row)"
                         :key="tag"
-                        outline
-                        color="grey-7"
+                        :outline="!isPaymentTag(tag)"
+                        :color="tagColor(tag)"
                         :label="tag"
                       />
                     </div>
@@ -493,16 +496,19 @@
                   :class="{ 'participants-view-dialog__stat-card--active': String(selectedKey) === String(group.key) }"
                   @click="selectGroup(group)"
                 >
-                  <q-card-section class="row items-center no-wrap">
-                    <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
-                    <div class="q-ml-md participants-view-dialog__stat-text">
-                      <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
-                      <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
-                      <div v-if="group.kidsCount" class="participants-view-dialog__stat-breakdown">
-                        <span>{{ group.adultCount }} adults</span>
-                        <span>{{ group.kidsCount }} kids</span>
+                  <q-card-section class="participants-view-dialog__stat-body">
+                    <div class="row items-center no-wrap">
+                      <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
+                      <div class="q-ml-md participants-view-dialog__stat-text">
+                        <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
                       </div>
                     </div>
+                    <PageMetricBar
+                      compact
+                      :total="group.participants.length"
+                      :adults="group.adultCount"
+                      :kids="group.kidsCount"
+                    />
                   </q-card-section>
                 </q-card>
               </div>
@@ -593,12 +599,12 @@
 
                 <template #body-cell-tags="props">
                   <q-td :props="props">
-                    <div v-if="props.row.tags?.length" class="participants-view-dialog__tags">
+                    <div v-if="displayTags(props.row).length" class="participants-view-dialog__tags">
                       <q-badge
-                        v-for="tag in props.row.tags"
+                        v-for="tag in displayTags(props.row)"
                         :key="tag"
-                        outline
-                        color="grey-7"
+                        :outline="!isPaymentTag(tag)"
+                        :color="tagColor(tag)"
                         :label="tag"
                       />
                     </div>
@@ -1123,6 +1129,7 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
 import EventParticipantFormDialog from "src/components/EventParticipantFormDialog.vue";
+import PageMetricBar from "src/components/PageMetricBar.vue";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
@@ -1130,7 +1137,10 @@ import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/chu
 import {
   filterParticipantsBySearch,
   filterParticipantsByTags,
+  isPaymentTag,
+  PAID_TAG,
   participantTagNames,
+  paymentTagColor,
   uniqueParticipantTags
 } from "src/utils/participantTags";
 
@@ -1238,15 +1248,29 @@ const tagModeOptions = [
 
 const tagExclude = computed(() => tagMode.value === "exclude");
 
+const paidView = computed(() => {
+  if (tagExclude.value || tagFilter.value.length !== 1) return false;
+  return String(tagFilter.value[0] || "").toLowerCase() === PAID_TAG.toLowerCase();
+});
+
+const dialogTitle = computed(() => (paidView.value ? "Paid participants" : "Participants"));
+
+const tagNameOptions = computed(() => ({
+  hasRegistrationFee: props.hasRegistrationFee
+}));
+
 const tagOptions = computed(() =>
-  uniqueParticipantTags(props.participants).map((tag) => ({
+  uniqueParticipantTags(props.participants, tagNameOptions.value).map((tag) => ({
     label: tag,
     value: tag
   }))
 );
 
 const tagFilteredParticipants = computed(() =>
-  filterParticipantsByTags(props.participants, tagFilter.value, { exclude: tagExclude.value })
+  filterParticipantsByTags(props.participants, tagFilter.value, {
+    exclude: tagExclude.value,
+    hasRegistrationFee: props.hasRegistrationFee
+  })
 );
 
 const sortedParticipants = computed(() =>
@@ -1267,7 +1291,17 @@ const sortedParticipants = computed(() =>
 );
 
 function filterParticipants(rows, terms) {
-  return filterParticipantsBySearch(rows, terms);
+  return filterParticipantsBySearch(rows, terms, tagNameOptions.value);
+}
+
+function displayTags(participant) {
+  const tags = participantTagNames(participant, tagNameOptions.value);
+  if (!paidView.value) return tags;
+  return tags.filter((tag) => !isPaymentTag(tag));
+}
+
+function tagColor(tag) {
+  return paymentTagColor(tag) || "grey-7";
 }
 
 const allColumns = computed(() => {
@@ -1279,7 +1313,7 @@ const allColumns = computed(() => {
     { name: "tags", label: "Tags", field: "tags", align: "left" }
   ];
 
-  if (props.hasRegistrationFee) {
+  if (props.hasRegistrationFee && !paidView.value) {
     columns.push({
       name: "registrationPaid",
       label: "Paid",
@@ -1341,6 +1375,7 @@ function mapParticipantRow(participant) {
     memberId,
     memberLinked,
     isUnlinked: !memberLinked,
+    tags: displayTags(participant),
     displayLastName: participant.lastName || participant.fullName || "—",
     displayFirstName:
       participant.firstName ||
@@ -1449,7 +1484,7 @@ const tagGroups = computed(() => {
   const narrowingByInclude = selectedTags.size > 0 && !tagExclude.value;
 
   tagFilteredParticipants.value.forEach((participant) => {
-    const tags = participantTagNames(participant);
+    const tags = displayTags(participant);
     if (!tags.length) return;
 
     tags.forEach((tag) => {
@@ -2320,7 +2355,7 @@ function findSelectedGroup(mode = viewMode.value) {
 function onShow() {
   viewMode.value =
     props.initialView === "church" || props.initialView === "tag" ? props.initialView : "all";
-  tagFilter.value = [];
+  tagFilter.value = props.initialView === "paid" && props.hasRegistrationFee ? [PAID_TAG] : [];
   tagMode.value = "include";
   participantFilter.value = "";
   groupParticipantFilter.value = "";
@@ -2537,6 +2572,12 @@ watch(
 
 .participants-view-dialog__stat-text {
   min-width: 0;
+}
+
+.participants-view-dialog__stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .participants-view-dialog__stat-label {

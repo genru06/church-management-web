@@ -75,7 +75,8 @@
                   hide-bottom-space
                 />
                 <div class="text-caption text-grey-6 q-mt-xs">
-                  A church can have multiple tags (for example House Church, Daughter Church, Outreach).
+                  A church can have multiple tags (for example House Church, Daughter Church, Outreach, LG Network Church).
+                  Churches tagged LG Network Church appear on the LG Network Churches page.
                 </div>
               </div>
             </div>
@@ -109,7 +110,8 @@ import AppSelect from "src/components/AppSelect.vue";
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   mode: { type: String, default: "create" },
-  churchId: { type: [String, Number], default: null }
+  churchId: { type: [String, Number], default: null },
+  defaultTags: { type: Array, default: () => [] }
 });
 
 const emit = defineEmits(["update:modelValue", "saved"]);
@@ -165,9 +167,18 @@ function mergeTagOptions(churchTags = []) {
   tagOptions.value = [...merged].sort((a, b) => a.localeCompare(b));
 }
 
+function applyDefaultTags() {
+  const defaults = Array.isArray(props.defaultTags) ? props.defaultTags.filter(Boolean) : [];
+  form.value.tags = [...defaults];
+  mergeTagOptions(defaults);
+}
+
 async function loadChurch() {
   if (props.mode !== "edit" || !props.churchId) {
     resetForm();
+    applyDefaultTags();
+    await nextTick();
+    tagsSelectKey.value += 1;
     return;
   }
 

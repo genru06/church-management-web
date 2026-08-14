@@ -191,12 +191,12 @@
 
         <template #body-cell-tags="props">
           <q-td :props="props">
-            <div v-if="props.row.tags?.length" class="attendance-sheet__tags">
+            <div v-if="displayTags(props.row).length" class="attendance-sheet__tags">
               <q-badge
-                v-for="tag in props.row.tags"
+                v-for="tag in displayTags(props.row)"
                 :key="tag"
-                outline
-                color="grey-7"
+                :outline="!isPaymentTag(tag)"
+                :color="tagColor(tag)"
                 :label="tag"
               />
             </div>
@@ -275,10 +275,14 @@ import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { formatEventTime } from "src/utils/eventTime";
 import {
+  eventHasRegistrationFee,
   filterParticipantsByAttendance,
   filterParticipantsByGroup,
   filterParticipantsBySearch,
   filterParticipantsByTags,
+  isPaymentTag,
+  participantTagNames,
+  paymentTagColor,
   uniqueParticipantTags
 } from "src/utils/participantTags";
 
@@ -321,8 +325,12 @@ const groupSourceOptions = [
   { label: "Reserved guest", value: "reservation" }
 ];
 
+const tagNameOptions = computed(() => ({
+  hasRegistrationFee: eventHasRegistrationFee(event.value)
+}));
+
 const tagOptions = computed(() =>
-  uniqueParticipantTags(participants.value).map((tag) => ({
+  uniqueParticipantTags(participants.value, tagNameOptions.value).map((tag) => ({
     label: tag,
     value: tag
   }))
@@ -380,7 +388,8 @@ const filteredParticipants = computed(() => {
     reservationId: selectedReservationId.value
   });
   rows = filterParticipantsByTags(rows, tagFilter.value, {
-    exclude: tagMode.value === "exclude"
+    exclude: tagMode.value === "exclude",
+    hasRegistrationFee: tagNameOptions.value.hasRegistrationFee
   });
   return filterParticipantsByAttendance(rows, attendanceStatus.value);
 });
@@ -406,7 +415,15 @@ const columns = [
 ];
 
 function filterParticipants(rows, terms) {
-  return filterParticipantsBySearch(rows, terms);
+  return filterParticipantsBySearch(rows, terms, tagNameOptions.value);
+}
+
+function displayTags(participant) {
+  return participantTagNames(participant, tagNameOptions.value);
+}
+
+function tagColor(tag) {
+  return paymentTagColor(tag) || "grey-7";
 }
 
 function formatDate(value) {

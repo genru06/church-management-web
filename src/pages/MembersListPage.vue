@@ -2,8 +2,24 @@
   <q-page class="members-page">
     <header class="members-page__header">
       <div class="members-page__heading">
-        <h1 class="members-page__title">Members</h1>
-        <span v-if="rows.length" class="members-page__count">{{ rows.length }}</span>
+        <q-btn
+          v-if="networkOnly"
+          dense
+          flat
+          round
+          icon="arrow_back"
+          color="grey-7"
+          to="/lg-network-churches"
+        >
+          <q-tooltip>Back to LG Network Churches</q-tooltip>
+        </q-btn>
+        <h1 class="members-page__title">{{ pageTitle }}</h1>
+        <PageMetricBar
+          v-if="rows.length"
+          :total="rows.length"
+          :adults="adultCount"
+          :kids="kidsCount"
+        />
       </div>
       <div class="members-page__actions">
         <q-btn
@@ -35,6 +51,17 @@
           accept=".xlsx,.xls"
           class="members-page__upload-input"
           @change="onUploadSelected"
+        />
+        <q-btn
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="church"
+          label="By church"
+          class="members-page__secondary-btn"
+          :disable="!rows.length || loading"
+          @click="openByChurchDialog"
         />
         <q-btn
           dense
@@ -133,7 +160,7 @@
 
         <template #body-cell-name="props">
           <q-td :props="props" class="members-table__name-cell">
-            <router-link :to="`/members/${props.row.id}`" class="members-table__name">
+            <router-link :to="memberDetailsTo(props.row.id)" class="members-table__name">
               {{ props.row.lastName }}, {{ props.row.firstName }}
             </router-link>
           </q-td>
@@ -151,9 +178,21 @@
           </q-td>
         </template>
 
-        <template #body-cell-dateOfBirth="props">
+        <template #body-cell-tags="props">
           <q-td :props="props">
-            <span class="members-table__muted">{{ formatDate(props.row.dateOfBirth) }}</span>
+            <div v-if="props.row.tags?.length" class="members-table__tags">
+              <q-chip
+                v-for="tag in props.row.tags"
+                :key="tag"
+                dense
+                size="sm"
+                color="blue-1"
+                text-color="primary"
+              >
+                {{ tag }}
+              </q-chip>
+            </div>
+            <span v-else class="members-table__muted">—</span>
           </q-td>
         </template>
 
@@ -166,7 +205,7 @@
               size="sm"
               color="grey-7"
               icon="visibility"
-              :to="`/members/${props.row.id}`"
+              :to="memberDetailsTo(props.row.id)"
             >
               <q-tooltip>View</q-tooltip>
             </q-btn>
@@ -204,10 +243,17 @@
       </q-table>
     </section>
 
+    <MembersByChurchDialog
+      v-model="byChurchDialogOpen"
+      :members="rows"
+      :network-only="networkOnly"
+    />
+
     <MemberFormDialog
       v-model="formDialogOpen"
       :mode="formMode"
       :member-id="editingMemberId"
+      :church-tag="networkChurchTag"
       @saved="onMemberSaved"
     />
 
@@ -282,6 +328,8 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { useAuthStore } from "src/stores/auth";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
+import MembersByChurchDialog from "src/components/MembersByChurchDialog.vue";
+import PageMetricBar from "src/components/PageMetricBar.vue";
 import { downloadMemberBulkTemplate, parseMemberBulkUpload } from "src/utils/memberBulkExcel";
 import { getChurchDisplayName, sortChurchesMainFirst } from "src/utils/churchDisplay";
 import AppSelect from "src/components/AppSelect.vue";
@@ -290,6 +338,15 @@ import {
   hasLifeGroupFilterTag,
   tagsForMemberApi
 } from "src/utils/memberPrint";
+import {
+  LG_NETWORK_CHURCH_TAG,
+  LG_NETWORK_MEMBERS_FROM,
+  LG_NETWORK_MEMBERS_PATH
+} from "src/utils/churchTags";
+
+const props = defineProps({
+  networkOnly: { type: Boolean, default: false }
+});
 
 const $q = useQuasar();
 const auth = useAuthStore();
@@ -306,6 +363,7 @@ const loading = ref(false);
 const uploading = ref(false);
 const uploadInputRef = ref(null);
 const formDialogOpen = ref(false);
+const byChurchDialogOpen = ref(false);
 const formMode = ref("create");
 const editingMemberId = ref(null);
 const templateDialogOpen = ref(false);
@@ -313,6 +371,18 @@ const templateScope = ref("general");
 const templateChurchId = ref(null);
 const allChurchOptions = ref([]);
 const churchesLoading = ref(false);
+
+const pageTitle = computed(() =>
+  props.networkOnly ? "LG Network Church Members" : "Members"
+);
+const listPath = computed(() => (props.networkOnly ? LG_NETWORK_MEMBERS_PATH : "/members"));
+const networkChurchTag = computed(() => (props.networkOnly ? LG_NETWORK_CHURCH_TAG : null));
+
+function memberDetailsTo(id) {
+  return props.networkOnly
+    ? { path: `/members/${id}`, query: { from: LG_NETWORK_MEMBERS_FROM } }
+    : `/members/${id}`;
+}
 
 const templateScopeOptions = [
   { label: "General", value: "general" },
@@ -376,11 +446,16 @@ function openCreateDialog() {
   formDialogOpen.value = true;
 }
 
+function openByChurchDialog() {
+  byChurchDialogOpen.value = true;
+}
+
 function openPrintPage() {
   router.push(
     getMembersPrintUrl({
       tags: tagFilter.value,
-      lifeGroupId: lifeGroupFilterEnabled.value ? lifeGroupFilter.value : null
+      lifeGroupId: lifeGroupFilterEnabled.value ? lifeGroupFilter.value : null,
+      networkOnly: props.networkOnly
     })
   );
 }
@@ -391,19 +466,15 @@ function openEditDialog(row) {
   formDialogOpen.value = true;
 }
 
-function onMemberSaved(member) {
-  const index = rawRows.value.findIndex((row) => row.id === member.id);
-  if (index >= 0) {
-    rawRows.value[index] = member;
-  } else {
-    rawRows.value.unshift(member);
-  }
+function onMemberSaved() {
+  loadMembers();
 }
 
 async function loadChurches() {
   churchesLoading.value = true;
   try {
-    const { data } = await api.get("/churches");
+    const params = networkChurchTag.value ? { tag: networkChurchTag.value } : {};
+    const { data } = await api.get("/churches", { params });
     allChurchOptions.value = sortChurchesMainFirst(
       data.map((church) => ({
         label: getChurchDisplayName(church),
@@ -471,12 +542,7 @@ async function onUploadSelected(event) {
     const { data } = await api.post("/members/import", payload);
 
     if (data.members?.length) {
-      const existingIds = new Set(rawRows.value.map((row) => row.id));
-      data.members.forEach((member) => {
-        if (!existingIds.has(member.id)) {
-          rawRows.value.unshift(member);
-        }
-      });
+      await loadMembers();
     }
 
     if (data.errors?.length) {
@@ -572,6 +638,7 @@ async function loadMembers() {
     if (lifeGroupFilterEnabled.value && lifeGroupFilter.value) {
       params.lifeGroupId = lifeGroupFilter.value;
     }
+    if (networkChurchTag.value) params.churchTag = networkChurchTag.value;
     const { data } = await api.get("/members", {
       params,
       paramsSerializer: {
@@ -638,7 +705,7 @@ function onTagFilterChange(value) {
     loadLifeGroups();
   }
   router.replace({
-    path: "/members",
+    path: listPath.value,
     query: buildMembersQuery({ tags: nextTags, lifeGroupId: lifeGroupFilter.value })
   });
 }
@@ -646,7 +713,7 @@ function onTagFilterChange(value) {
 function onLifeGroupFilterChange(value) {
   lifeGroupFilter.value = value || null;
   router.replace({
-    path: "/members",
+    path: listPath.value,
     query: buildMembersQuery({
       tags: tagFilter.value,
       lifeGroupId: lifeGroupFilter.value
@@ -670,8 +737,12 @@ const emptyMessage = computed(() => {
       : "No members with these tags.";
   }
   if (filter.value) return "No members match your search.";
-  return "No members yet.";
+  return props.networkOnly ? "No members in LG Network Churches yet." : "No members yet.";
 });
+
+function isKidsMember(member) {
+  return (member.tags || []).some((tag) => String(tag || "").trim().toLowerCase() === "kids");
+}
 
 const rows = computed(() =>
   rawRows.value.map((m) => ({
@@ -681,6 +752,9 @@ const rows = computed(() =>
     lifeGroup: m.lifeGroup || ""
   }))
 );
+
+const kidsCount = computed(() => rows.value.filter(isKidsMember).length);
+const adultCount = computed(() => rows.value.length - kidsCount.value);
 
 const columns = [
   {
@@ -693,7 +767,7 @@ const columns = [
   },
   { name: "church", label: "Church", field: "church", align: "left", sortable: true },
   { name: "lifeGroup", label: "Lifegroup", field: "lifeGroup", align: "left", sortable: true },
-  { name: "dateOfBirth", label: "Birthdate", field: "dateOfBirth", align: "left", sortable: true },
+  { name: "tags", label: "Tags", field: "tags", align: "left" },
   { name: "actions", label: "", field: "actions", align: "right", style: "width: 96px" }
 ];
 
@@ -705,7 +779,7 @@ onMounted(async () => {
 });
 
 watch(
-  () => [route.query.tag, route.query.lifeGroupId],
+  () => [props.networkOnly, route.query.tag, route.query.lifeGroupId],
   async () => {
     syncFiltersFromRoute();
     if (lifeGroupFilterEnabled.value && !lifeGroupOptions.value.length) {
@@ -739,8 +813,8 @@ watch(lifeGroupFilterEnabled, (enabled) => {
 
 .members-page__heading {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -751,20 +825,6 @@ watch(lifeGroupFilterEnabled, (enabled) => {
   line-height: 1.2;
   letter-spacing: -0.01em;
   color: #1a1a2e;
-}
-
-.members-page__count {
-  display: inline-flex;
-  align-items: center;
-  min-width: 22px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  background: #eef1f6;
-  color: #5c6370;
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1;
 }
 
 .members-page__add-btn {
@@ -794,6 +854,10 @@ watch(lifeGroupFilterEnabled, (enabled) => {
 @media (max-width: 599px) {
   .members-page {
     padding: 8px 10px 12px;
+  }
+
+  .members-page__heading {
+    flex-wrap: wrap;
   }
 
   .members-table__search {
@@ -943,6 +1007,13 @@ watch(lifeGroupFilterEnabled, (enabled) => {
     color: #1976d2;
     text-decoration: underline;
   }
+}
+
+.members-table__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
 }
 
 .members-table__muted {
