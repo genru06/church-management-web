@@ -1,15 +1,9 @@
 <template>
   <q-page class="entity-page">
     <header class="entity-page__header">
-      <div class="entity-page__heading event-dashboard__heading">
+      <div class="entity-page__heading">
         <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push('/events')" />
         <h1 class="entity-page__title">{{ dashboard.event?.name || "Event dashboard" }}</h1>
-        <PageMetricBar
-          v-if="dashboard.event"
-          :total="eventParticipantTotal"
-          :adults="eventAdultCount"
-          :kids="eventKidsCount"
-        />
       </div>
       <div class="entity-page__actions">
         <q-btn
@@ -68,15 +62,16 @@
             @click="openParticipantsView('all')"
           >
             <span class="event-stat-card__label">Participants</span>
+            <span class="event-stat-card__value event-stat-card__value--xl">
+              {{ Number(eventParticipantTotal).toLocaleString() }}
+            </span>
             <PageMetricBar
               compact
-              :total="eventParticipantTotal"
+              :hide-total="true"
               :adults="eventAdultCount"
               :kids="eventKidsCount"
+              :reserved="reservationTotal"
             />
-            <span v-if="reservationTotal" class="event-stat-card__breakdown">
-              <span>{{ reservationTotal }} reserved</span>
-            </span>
             <span class="event-stat-card__hint">View list</span>
           </button>
         </div>
@@ -484,25 +479,6 @@
               <span class="entity-table__muted">{{ props.row.churchName || "—" }}</span>
             </q-td>
           </template>
-          <template #body-cell-lifegroupName="props">
-            <q-td :props="props">
-              <span class="entity-table__muted">{{ props.row.lifegroupName || "—" }}</span>
-            </q-td>
-          </template>
-          <template #body-cell-tags="props">
-            <q-td :props="props">
-              <div v-if="displayTags(props.row).length" class="event-dashboard__tags">
-                <q-badge
-                  v-for="tag in displayTags(props.row)"
-                  :key="tag"
-                  :outline="!isPaymentTag(tag)"
-                  :color="tagColor(tag)"
-                  :label="tag"
-                />
-              </div>
-              <span v-else class="entity-table__muted">—</span>
-            </q-td>
-          </template>
           <template #body-cell-registrationPaid="props">
             <q-td :props="props">
               <div class="event-dashboard__paid-cell">
@@ -538,7 +514,7 @@
           </template>
           <template #body-cell-actions="props">
             <q-td :props="props" class="entity-table__actions">
-              <q-btn flat dense round size="sm" color="grey-7" icon="edit" @click="editParticipant(props.row)">
+              <q-btn flat dense round size="sm" color="grey-7" icon="edit" @click.stop="editParticipant(props.row)">
                 <q-tooltip>Edit</q-tooltip>
               </q-btn>
               <q-btn flat dense round size="sm" color="grey-7" icon="delete_outline" @click="removeParticipant(props.row)">
@@ -921,9 +897,6 @@ import { formatEventTime } from "src/utils/eventTime";
 import {
   filterParticipantsBySearch,
   filterParticipantsByTags,
-  isPaymentTag,
-  participantTagNames,
-  paymentTagColor,
   uniqueParticipantTags
 } from "src/utils/participantTags";
 
@@ -1010,14 +983,6 @@ const tagFilteredParticipants = computed(() =>
   })
 );
 
-function displayTags(participant) {
-  return participantTagNames(participant, participantTagNameOptions.value);
-}
-
-function tagColor(tag) {
-  return paymentTagColor(tag) || "grey-7";
-}
-
 const templateScopeOptions = [
   { label: "General", value: "general" },
   { label: "Per church", value: "church" }
@@ -1039,13 +1004,14 @@ const reservationTotal = computed(() =>
   (dashboard.value.reservations || []).reduce((sum, row) => sum + Number(row.reservedCount || 0), 0)
 );
 
-const eventParticipantTotal = computed(() => Number(dashboard.value.stats?.participantCount || 0));
+const eventRegisteredTotal = computed(() => Number(dashboard.value.stats?.participantCount || 0));
 const eventKidsCount = computed(() => Number(dashboard.value.stats?.kidsCount || 0));
 const eventAdultCount = computed(() => {
   const adults = dashboard.value.stats?.adultCount;
   if (adults != null && adults !== "") return Number(adults || 0);
-  return Math.max(eventParticipantTotal.value - eventKidsCount.value, 0);
+  return Math.max(eventRegisteredTotal.value - eventKidsCount.value, 0);
 });
+const eventParticipantTotal = computed(() => eventRegisteredTotal.value + reservationTotal.value);
 
 const canManageReservations = computed(
   () => auth.canDo("action.events.edit") || auth.canDo("action.events.manage_participants")
@@ -1081,9 +1047,7 @@ const participantColumns = computed(() => {
   const columns = [
     { name: "lastName", label: "Last name", field: "lastName", align: "left", sortable: true },
     { name: "firstName", label: "First name", field: "firstName", align: "left", sortable: true },
-    { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true },
-    { name: "lifegroupName", label: "LifeGroup", field: "lifegroupName", align: "left", sortable: true },
-    { name: "tags", label: "Tags", field: "tags", align: "left" }
+    { name: "churchName", label: "Church", field: "churchName", align: "left", sortable: true }
   ];
 
   if (Number(dashboard.value.event?.registrationFee || 0) > 0) {
@@ -1662,12 +1626,6 @@ onMounted(loadDashboard);
 </script>
 
 <style scoped lang="scss">
-.event-dashboard__heading {
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .event-dashboard__stats {
   margin-top: 4px;
   align-items: stretch;
@@ -1753,6 +1711,13 @@ onMounted(loadDashboard);
   color: #1a1a2e;
 }
 
+.event-stat-card__value--xl {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
 .event-stat-card__expected {
   font-size: 0.72rem;
   font-weight: 600;
@@ -1825,12 +1790,6 @@ onMounted(loadDashboard);
     margin: 1px 2px;
     font-size: 0.72rem;
   }
-}
-
-.event-dashboard__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .event-dashboard__paid-cell {

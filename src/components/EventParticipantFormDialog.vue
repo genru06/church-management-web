@@ -3,7 +3,6 @@
     :model-value="modelValue"
     persistent
     @update:model-value="$emit('update:modelValue', $event)"
-    @show="onShow"
   >
     <q-card class="entity-dialog">
       <header class="entity-dialog__header">
@@ -26,7 +25,7 @@
       <q-card-section class="entity-dialog__body">
         <q-form ref="formRef" class="entity-dialog__form" @submit.prevent="submit">
           <div class="row q-col-gutter-sm">
-            <div v-if="!isEditingGuest" class="col-12">
+            <div v-if="mode === 'create' && !isEditingGuest" class="col-12">
               <AppSelect
                 v-model="form.memberId"
                 :options="memberOptions"
@@ -39,6 +38,13 @@
                 hide-bottom-space
                 @update:model-value="onMemberSelected"
               />
+            </div>
+
+            <div v-if="mode === 'edit' && originalMemberId" class="col-12">
+              <p class="event-participant-form__hint">
+                Linked member:
+                {{ form.fullName || "This participant" }}
+              </p>
             </div>
 
             <div v-if="mode === 'create' && !form.memberId" class="col-12">
@@ -200,6 +206,7 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm());
 const originalReservationId = ref(null);
+const originalMemberId = ref(null);
 
 function normalizeGuestName(name) {
   return String(name || "")
@@ -272,14 +279,53 @@ function close() {
 function resetForm() {
   form.value = emptyForm();
   originalReservationId.value = null;
+  originalMemberId.value = null;
   formRef.value?.resetValidation();
+}
+
+function numericId(value) {
+  if (value == null || value === "") return null;
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function hydrateEditForm(participant) {
+  const memberId = numericId(participant.memberId ?? participant.member_id);
+  const reservationId = numericId(participant.reservationId);
+  originalReservationId.value = reservationId;
+  originalMemberId.value = memberId;
+
+  const fullName =
+    participant.fullName ||
+    [participant.firstName, participant.lastName].filter(Boolean).join(" ") ||
+    "";
+
+  form.value = {
+    memberId,
+    addAsMember: false,
+    churchId: numericId(participant.churchId),
+    reservationId,
+    firstName: participant.firstName || "",
+    lastName: participant.lastName || "",
+    fullName,
+    email: participant.email || "",
+    phone: participant.phone || ""
+  };
+
+  if (memberId) {
+    const label =
+      participant.lastName && participant.firstName
+        ? `${participant.lastName}, ${participant.firstName}`
+        : fullName || `Member #${memberId}`;
+    memberOptions.value = [{ label, value: memberId, member: participant }];
+  }
 }
 
 async function loadMembers() {
   const { data } = await api.get("/members");
   memberOptions.value = data.map((m) => ({
     label: `${m.lastName}, ${m.firstName}`,
-    value: m.id,
+    value: Number(m.id),
     member: m
   }));
 }
@@ -338,35 +384,30 @@ function onAddAsMemberChanged(enabled) {
 }
 
 async function onShow() {
-  if (!isEditingGuest.value) {
-    await loadMembers();
+  if (props.mode === "edit" && props.participant) {
+    hydrateEditForm(props.participant);
+    if (originalMemberId.value || isEditingGuest.value) return;
+    try {
+      await loadMembers();
+    } catch {
+      $q.notify({ type: "warning", message: "Could not load the member list." });
+    }
+    return;
   }
 
-  if (props.mode === "edit" && props.participant) {
-    const reservationId = props.participant.reservationId
-      ? Number(props.participant.reservationId)
-      : null;
-    originalReservationId.value = reservationId;
-    form.value = {
-      memberId: props.participant.memberId || null,
-      addAsMember: false,
-      churchId: null,
-      reservationId,
-      firstName: props.participant.firstName || "",
-      lastName: props.participant.lastName || "",
-      fullName: props.participant.fullName || "",
-      email: props.participant.email || "",
-      phone: props.participant.phone || ""
-    };
-  } else {
-    resetForm();
+  resetForm();
+  try {
+    await loadMembers();
+  } catch {
+    $q.notify({ type: "warning", message: "Could not load the member list." });
   }
 }
 
 function buildPayload() {
-  if (form.value.memberId) {
+  const linkedMemberId = form.value.memberId || originalMemberId.value;
+  if (linkedMemberId) {
     return {
-      memberId: form.value.memberId,
+      memberId: linkedMemberId,
       fullName: form.value.fullName,
       email: form.value.email,
       phone: form.value.phone
@@ -455,7 +496,11 @@ async function submit() {
 watch(
   () => props.modelValue,
   (open) => {
-    if (!open) resetForm();
+    if (open) {
+      void onShow();
+      return;
+    }
+    resetForm();
   }
 );
 </script>

@@ -250,12 +250,20 @@
                   :class="{ 'participants-view-dialog__stat-card--active': selectedKey === group.key }"
                   @click="selectGroup(group)"
                 >
-                  <q-card-section class="row items-center no-wrap">
-                    <q-avatar :color="cardColor(index)" text-color="white" icon="sell" />
-                    <div class="q-ml-md participants-view-dialog__stat-text">
-                      <div class="participants-view-dialog__stat-label">{{ group.title }}</div>
-                      <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
+                  <q-card-section class="participants-view-dialog__stat-body">
+                    <div class="row items-center no-wrap">
+                      <q-avatar :color="cardColor(index)" text-color="white" icon="sell" />
+                      <div class="q-ml-md participants-view-dialog__stat-text">
+                        <div class="participants-view-dialog__stat-label">{{ group.title }}</div>
+                        <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
+                      </div>
                     </div>
+                    <PageMetricBar
+                      compact
+                      :hide-total="true"
+                      :adults="group.adultCount"
+                      :kids="group.kidsCount"
+                    />
                   </q-card-section>
                 </q-card>
               </div>
@@ -267,6 +275,9 @@
                   <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.title }}</h3>
                   <p class="participants-view-dialog__detail-meta">
                     {{ selectedGroup.participants.length }} participant(s)
+                    <span>
+                      · {{ selectedGroup.adultCount || 0 }} adults · {{ selectedGroup.kidsCount || 0 }} kids
+                    </span>
                     <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
                   </p>
                 </div>
@@ -460,23 +471,34 @@
                     :class="{ 'participants-view-dialog__stat-card--active': selectedKey === reservation.key }"
                     @click="selectGroup(reservation)"
                   >
-                    <q-card-section class="row items-center no-wrap">
-                      <q-avatar
-                        :color="cardColor(index + 2)"
-                        text-color="white"
-                        icon="groups"
-                      />
-                      <div class="q-ml-md participants-view-dialog__stat-text">
-                        <div class="participants-view-dialog__stat-label">
-                          {{ reservation.label }}
-                        </div>
-                        <div class="participants-view-dialog__stat-value">
-                          {{ reservation.participants.length }}
-                          <span class="participants-view-dialog__stat-reserved">
-                            / {{ reservation.reservedCount }} reserved
-                          </span>
+                    <q-card-section class="participants-view-dialog__stat-body">
+                      <div class="row items-center no-wrap">
+                        <q-avatar
+                          :color="cardColor(index + 2)"
+                          text-color="white"
+                          icon="groups"
+                        />
+                        <div class="q-ml-md participants-view-dialog__stat-text">
+                          <div class="participants-view-dialog__stat-label">
+                            {{ reservation.label }}
+                          </div>
+                          <div class="participants-view-dialog__stat-value">
+                            {{
+                              Math.max(
+                                reservation.participants.length,
+                                Number(reservation.reservedCount || 0)
+                              )
+                            }}
+                          </div>
                         </div>
                       </div>
+                      <PageMetricBar
+                        compact
+                        :hide-total="true"
+                        :adults="reservation.adultCount"
+                        :kids="reservation.kidsCount"
+                        :reserved="reservation.reservedCount"
+                      />
                     </q-card-section>
                   </q-card>
                 </div>
@@ -501,11 +523,12 @@
                       <q-avatar :color="cardColor(index)" text-color="white" icon="church" />
                       <div class="q-ml-md participants-view-dialog__stat-text">
                         <div class="participants-view-dialog__stat-label">{{ group.churchName }}</div>
+                        <div class="participants-view-dialog__stat-value">{{ group.participants.length }}</div>
                       </div>
                     </div>
                     <PageMetricBar
                       compact
-                      :total="group.participants.length"
+                      :hide-total="true"
                       :adults="group.adultCount"
                       :kids="group.kidsCount"
                     />
@@ -520,11 +543,11 @@
                   <h3 class="participants-view-dialog__detail-title">{{ selectedGroup.title }}</h3>
                   <p class="participants-view-dialog__detail-meta">
                     {{ selectedGroup.participants.length }} participant(s)
+                    <span>
+                      · {{ selectedGroup.adultCount || 0 }} adults · {{ selectedGroup.kidsCount || 0 }} kids
+                    </span>
                     <span v-if="selectedGroup.isReservation">
                       · {{ selectedGroup.reservedCount }} reserved
-                    </span>
-                    <span v-if="selectedGroup.kidsCount">
-                      · {{ selectedGroup.adultCount }} adults · {{ selectedGroup.kidsCount }} kids
                     </span>
                     <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
                   </p>
@@ -1512,10 +1535,16 @@ const tagGroups = computed(() => {
   });
 
   return Array.from(map.values())
-    .map((group) => ({
-      ...group,
-      participants: sortParticipantRows(group.participants)
-    }))
+    .map((group) => {
+      const participants = sortParticipantRows(group.participants);
+      const kidsCount = participants.filter((row) => row.isKid).length;
+      return {
+        ...group,
+        participants,
+        kidsCount,
+        adultCount: participants.length - kidsCount
+      };
+    })
     .sort((a, b) =>
       String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base" })
     );
@@ -2591,14 +2620,15 @@ watch(
 }
 
 .participants-view-dialog__stat-value {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: #1a1a2e;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .participants-view-dialog__stat-reserved {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 500;
   color: #8b93a1;
 }
