@@ -67,6 +67,7 @@
             </span>
             <PageMetricBar
               compact
+              stacked
               :hide-total="true"
               :adults="eventAdultCount"
               :kids="eventKidsCount"

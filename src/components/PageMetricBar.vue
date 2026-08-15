@@ -1,7 +1,10 @@
 <template>
   <div
     class="page-metric-bar"
-    :class="{ 'page-metric-bar--compact': compact }"
+    :class="{
+      'page-metric-bar--compact': compact,
+      'page-metric-bar--stacked': stacked
+    }"
   >
     <div v-if="!props.hideTotal" class="page-metric-bar__stat page-metric-bar__stat--total">
       <q-icon name="groups" :size="iconSize" color="grey-7" />
@@ -35,6 +38,7 @@ const props = defineProps({
   kids: { type: Number, default: 0 },
   reserved: { type: [Number, String], default: null },
   compact: { type: Boolean, default: false },
+  stacked: { type: Boolean, default: false },
   hideTotal: { type: Boolean, default: false }
 });
 
@@ -118,6 +122,13 @@ function formatCount(value) {
     align-items: center;
     gap: 5px;
     padding: 6px 8px;
+    overflow: hidden;
+  }
+
+  .page-metric-bar__value,
+  .page-metric-bar__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .page-metric-bar__value {
@@ -126,6 +137,15 @@ function formatCount(value) {
 
   .page-metric-bar__label {
     font-size: 0.56rem;
+  }
+}
+
+.page-metric-bar--stacked {
+  .page-metric-bar__stat {
+    flex-direction: column;
+    min-height: 52px;
+    gap: 3px;
+    padding: 6px 4px;
   }
 }
 </style>
