@@ -24,19 +24,6 @@
         </div>
       </header>
 
-      <section class="member-profile__panel">
-        <div v-if="member.tags?.length" class="member-profile__tags">
-          <span v-for="tag in member.tags" :key="tag" class="member-profile__tag">{{ tag }}</span>
-        </div>
-
-        <dl class="member-profile__grid">
-          <div v-for="item in profileItems" :key="item.label" class="member-profile__row">
-            <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
-          </div>
-        </dl>
-      </section>
-
       <section class="member-profile__panel member-profile__qr">
         <h2 class="member-profile__section-title">Member QR code</h2>
         <p class="member-profile__qr-note">
@@ -55,6 +42,19 @@
           {{ member.qrToken ? "Unable to generate QR code on this device." : "QR code is not available for this member yet." }}
         </p>
         <p v-if="member.id" class="member-profile__qr-id">ID #{{ member.id }}</p>
+      </section>
+
+      <section class="member-profile__panel">
+        <div v-if="member.tags?.length" class="member-profile__tags">
+          <span v-for="tag in member.tags" :key="tag" class="member-profile__tag">{{ tag }}</span>
+        </div>
+
+        <dl class="member-profile__grid">
+          <div v-for="item in profileItems" :key="item.label" class="member-profile__row">
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
+          </div>
+        </dl>
       </section>
     </div>
 
