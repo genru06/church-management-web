@@ -471,34 +471,25 @@
                     :class="{ 'participants-view-dialog__stat-card--active': selectedKey === reservation.key }"
                     @click="selectGroup(reservation)"
                   >
-                    <q-card-section class="participants-view-dialog__stat-body">
-                      <div class="row items-center no-wrap">
-                        <q-avatar
-                          :color="cardColor(index + 2)"
-                          text-color="white"
-                          icon="groups"
-                        />
-                        <div class="q-ml-md participants-view-dialog__stat-text">
-                          <div class="participants-view-dialog__stat-label">
-                            {{ reservation.label }}
-                          </div>
-                          <div class="participants-view-dialog__stat-value">
-                            {{
-                              Math.max(
-                                reservation.participants.length,
-                                Number(reservation.reservedCount || 0)
-                              )
-                            }}
-                          </div>
+                    <q-card-section class="row items-center no-wrap">
+                      <q-avatar
+                        :color="cardColor(index + 2)"
+                        text-color="white"
+                        icon="groups"
+                      />
+                      <div class="q-ml-md participants-view-dialog__stat-text">
+                        <div class="participants-view-dialog__stat-label">
+                          {{ reservation.label }}
+                        </div>
+                        <div class="participants-view-dialog__stat-value">
+                          {{
+                            Math.max(
+                              reservation.participants.length,
+                              Number(reservation.reservedCount || 0)
+                            )
+                          }}
                         </div>
                       </div>
-                      <PageMetricBar
-                        compact
-                        :hide-total="true"
-                        :adults="reservation.adultCount"
-                        :kids="reservation.kidsCount"
-                        :reserved="reservation.reservedCount"
-                      />
                     </q-card-section>
                   </q-card>
                 </div>

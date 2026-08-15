@@ -111,11 +111,13 @@ function formatCount(value) {
   .page-metric-bar__stat {
     flex: 1 1 0;
     min-width: 0;
-    min-height: 52px;
-    flex-direction: column;
+    min-height: 32px;
+    flex-direction: row;
+    flex-wrap: nowrap;
     justify-content: center;
-    gap: 3px;
-    padding: 6px 4px;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
   }
 
   .page-metric-bar__value {
