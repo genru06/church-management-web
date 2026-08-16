@@ -60,6 +60,7 @@
         <q-card-section class="text-center">
           <q-icon :name="checkInResult?.alreadyCheckedIn ? 'info' : 'check_circle'" :color="checkInResult?.alreadyCheckedIn ? 'warning' : 'positive'" size="48px" />
           <h3 class="q-mt-md q-mb-xs">{{ checkInResult?.fullName }}</h3>
+          <EventScanPlacement :placement="checkInPlacement" />
           <p>{{ checkInResult?.alreadyCheckedIn ? "Already checked in." : "Attendance recorded successfully." }}</p>
         </q-card-section>
         <q-card-actions vertical align="stretch" class="q-px-md q-pb-md">
@@ -103,6 +104,7 @@
           <q-icon name="payments" color="negative" size="48px" />
           <q-badge color="negative" label="Unpaid" class="q-mt-sm" />
           <h3 class="q-mt-md q-mb-xs">{{ unpaidParticipant?.fullName || "Participant" }}</h3>
+          <EventScanPlacement :placement="unpaidPlacement" />
           <p class="event-scan-page__unpaid-message">{{ unpaidMessage }}</p>
           <p class="event-scan-page__unpaid-note">
             Attendance was <strong>not</strong> recorded.
@@ -141,7 +143,8 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
-import { eventHasRegistrationFee } from "src/utils/participantTags";
+import EventScanPlacement from "src/components/EventScanPlacement.vue";
+import { eventHasRegistrationFee, participantPlacement } from "src/utils/participantTags";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -168,6 +171,8 @@ const unpaidParticipant = ref(null);
 const pendingCheckInBody = ref(null);
 
 const hasRegistrationFee = computed(() => eventHasRegistrationFee(event.value));
+const checkInPlacement = computed(() => participantPlacement(checkInResult.value));
+const unpaidPlacement = computed(() => participantPlacement(unpaidParticipant.value));
 
 let scanner = null;
 let scanBusy = false;

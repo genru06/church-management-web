@@ -187,3 +187,45 @@ export function filterParticipantsByGroup(
 
   return rows;
 }
+
+function hasValue(value) {
+  return value != null && value !== "";
+}
+
+export function participantPersonTags(participant) {
+  return (Array.isArray(participant?.tags) ? participant.tags : [])
+    .map((tag) => String(tag || "").trim())
+    .filter((tag) => tag && !isPaymentTag(tag));
+}
+
+export function participantPlacement(participant) {
+  if (!participant) return null;
+
+  if (hasValue(participant.reservationId) && !hasValue(participant.churchId)) {
+    return {
+      kind: "guest",
+      icon: "groups",
+      kindLabel: "Guest list",
+      label: participant.reservationLabel || "Guest list",
+      tags: []
+    };
+  }
+
+  if (hasValue(participant.churchId)) {
+    return {
+      kind: "church",
+      icon: "church",
+      kindLabel: "Church",
+      label: participant.churchName || "Church",
+      tags: []
+    };
+  }
+
+  return {
+    kind: "unassigned",
+    icon: "sell",
+    kindLabel: "Unassigned",
+    label: "Unassigned",
+    tags: participantPersonTags(participant)
+  };
+}
