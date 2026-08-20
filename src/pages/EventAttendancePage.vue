@@ -177,9 +177,17 @@
           </div>
         </template>
 
+        <template #body-cell-fullName="props">
+          <q-td :props="props">
+            <button type="button" class="entity-table__link" @click="openParticipantQrDialog(props.row)">
+              {{ props.row.fullName }}
+            </button>
+          </q-td>
+        </template>
+
         <template #body-cell-churchName="props">
           <q-td :props="props">
-            <span class="entity-table__muted">{{ props.row.churchName || props.row.reservationLabel || "—" }}</span>
+            <span class="entity-table__muted">{{ participantGroupLabel(props.row) }}</span>
           </q-td>
         </template>
 
@@ -261,6 +269,43 @@
         </template>
       </q-table>
     </section>
+
+    <q-dialog v-model="qrDialogOpen" @hide="resetParticipantQrDialog">
+      <q-card class="entity-dialog attendance-qr-dialog">
+        <header class="entity-dialog__header">
+          <div>
+            <h2 class="entity-dialog__title">Participant QR</h2>
+            <p class="entity-dialog__subtitle">{{ event?.name || "Attendance sheet" }}</p>
+          </div>
+          <q-btn flat round dense icon="close" color="grey-7" @click="qrDialogOpen = false" />
+        </header>
+
+        <q-separator />
+
+        <q-card-section class="entity-dialog__body attendance-qr-dialog__body">
+          <div v-if="selectedParticipant" class="attendance-qr-dialog__content">
+            <div class="attendance-qr-dialog__qr-wrap">
+              <img
+                v-if="selectedQrUrl"
+                :src="selectedQrUrl"
+                :alt="`QR for ${selectedParticipant.fullName}`"
+                class="attendance-qr-dialog__qr"
+              />
+              <q-spinner v-else size="32px" color="primary" />
+            </div>
+            <p class="attendance-qr-dialog__id">ID #{{ participantDisplayId(selectedParticipant) }}</p>
+            <h3 class="attendance-qr-dialog__name">{{ selectedParticipant.fullName }}</h3>
+            <p class="attendance-qr-dialog__group">{{ participantGroupLabel(selectedParticipant) }}</p>
+          </div>
+        </q-card-section>
+
+        <q-separator />
+
+        <footer class="entity-dialog__footer">
+          <q-btn flat no-caps label="Close" color="grey-8" @click="qrDialogOpen = false" />
+        </footer>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -308,6 +353,9 @@ const groupSource = ref(null);
 const selectedChurchId = ref(null);
 const selectedLifeGroupId = ref(null);
 const selectedReservationId = ref(null);
+const qrDialogOpen = ref(false);
+const selectedParticipant = ref(null);
+const selectedQrUrl = ref("");
 
 const tagModeOptions = [
   { label: "Include", value: "include" },
@@ -420,6 +468,41 @@ function filterParticipants(rows, terms) {
 
 function displayTags(participant) {
   return participantTagNames(participant, tagNameOptions.value);
+}
+
+function participantDisplayId(participant) {
+  const memberId = Number(participant?.memberId);
+  if (Number.isFinite(memberId) && memberId > 0) return memberId;
+  return participant?.id || "—";
+}
+
+function participantGroupLabel(participant) {
+  return participant?.churchName || participant?.reservationLabel || "—";
+}
+
+let qrDialogSeq = 0;
+
+async function openParticipantQrDialog(participant) {
+  const seq = ++qrDialogSeq;
+  selectedParticipant.value = participant;
+  selectedQrUrl.value = qrByParticipant.value[participant.id] || "";
+  qrDialogOpen.value = true;
+
+  try {
+    const payload = buildCheckInPayload(eventId, participant);
+    const dataUrl = await generateQrDataUrl(payload, 280);
+    if (seq === qrDialogSeq) selectedQrUrl.value = dataUrl;
+  } catch {
+    if (seq === qrDialogSeq && !selectedQrUrl.value) {
+      $q.notify({ type: "negative", message: "Failed to generate QR code." });
+    }
+  }
+}
+
+function resetParticipantQrDialog() {
+  qrDialogSeq += 1;
+  selectedParticipant.value = null;
+  selectedQrUrl.value = "";
 }
 
 function tagColor(tag) {
@@ -612,5 +695,56 @@ onMounted(loadAttendance);
   width: 72px;
   height: 72px;
   display: block;
+}
+
+.attendance-qr-dialog {
+  width: min(380px, 92vw);
+}
+
+.attendance-qr-dialog__body {
+  text-align: center;
+}
+
+.attendance-qr-dialog__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.attendance-qr-dialog__qr-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+}
+
+.attendance-qr-dialog__qr {
+  width: min(260px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
+  display: block;
+  background: #fff;
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+}
+
+.attendance-qr-dialog__id {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  color: #8b93a1;
+}
+
+.attendance-qr-dialog__name {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1a1a2e;
+}
+
+.attendance-qr-dialog__group {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
 }
 </style>
