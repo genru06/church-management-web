@@ -14,7 +14,7 @@
           color="primary"
           icon="qr_code_scanner"
           label="Scan attendance"
-          @click="router.push(`/events/${eventId}/scan`)"
+          @click="router.push(scanUrl)"
         />
         <q-btn
           v-if="auth.canDo('action.events.attendance')"
@@ -24,7 +24,7 @@
           color="primary"
           icon="fact_check"
           label="Attendance sheet"
-          @click="router.push(`/events/${eventId}/attendance`)"
+          @click="router.push(attendanceUrl)"
         />
         <q-btn
           v-if="registrationOpen"
@@ -98,7 +98,7 @@
         </div>
         <div class="col-6 col-sm-4 col-md-3 col-lg-2">
           <div class="event-stat-card">
-            <span class="event-stat-card__label">Attended</span>
+            <span class="event-stat-card__label">{{ attendedLabel }}</span>
             <span class="event-stat-card__value">{{ dashboard.stats.attendedCount }}</span>
           </div>
         </div>
@@ -129,6 +129,29 @@
               Expected {{ formatCurrency(expectedCollection) }}
             </span>
             <span class="event-stat-card__hint">View paid participants</span>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="sessionStats.length > 1" class="entity-page__panel q-mb-md">
+        <div class="event-dashboard__section-header">
+          <h2>Attendance by day</h2>
+        </div>
+        <div class="event-dashboard__day-compare">
+          <button
+            v-for="stat in sessionStats"
+            :key="stat.id || stat.sessionDate"
+            type="button"
+            class="event-stat-card event-stat-card--clickable"
+            @click="openAttendanceSheet(stat.id)"
+          >
+            <span class="event-stat-card__label">{{ stat.label }}</span>
+            <span class="event-stat-card__value">{{ stat.attendedCount }}</span>
+            <span class="event-stat-card__breakdown">
+              <span>{{ formatEventDate(stat.sessionDate) }}</span>
+              <span>{{ stat.attendanceRate }}% present</span>
+            </span>
+            <span class="event-stat-card__hint">Open attendance sheet</span>
           </button>
         </div>
       </section>
@@ -234,7 +257,7 @@
           <dl class="entity-details">
             <div class="entity-details__item">
               <dt class="entity-details__label">Date</dt>
-              <dd class="entity-details__value">{{ formatDate(dashboard.event.eventDate) }}</dd>
+              <dd class="entity-details__value">{{ formatEventDates(dashboard.event) }}</dd>
             </div>
             <div class="entity-details__item">
               <dt class="entity-details__label">Time</dt>
@@ -895,6 +918,7 @@ import {
   isRegistrationOpen
 } from "src/utils/eventRegistration";
 import { formatEventTime } from "src/utils/eventTime";
+import { eventSessions, formatEventDate, formatEventDates } from "src/utils/eventDates";
 import {
   filterParticipantsBySearch,
   filterParticipantsByTags,
@@ -1017,6 +1041,17 @@ const eventParticipantTotal = computed(() => eventRegisteredTotal.value + reserv
 const canManageReservations = computed(
   () => auth.canDo("action.events.edit") || auth.canDo("action.events.manage_participants")
 );
+const sessionStats = computed(
+  () => dashboard.value.stats?.sessionStats || eventSessions(dashboard.value.event)
+);
+const attendedLabel = computed(() => (sessionStats.value.length > 1 ? "Attended any day" : "Attended"));
+const attendanceUrl = computed(() => `/events/${eventId}/attendance`);
+const scanUrl = computed(() => `/events/${eventId}/scan`);
+
+function openAttendanceSheet(sessionId) {
+  const query = sessionId != null && sessionId !== "" ? `?session=${sessionId}` : "";
+  router.push(`/events/${eventId}/attendance${query}`);
+}
 
 const reservationColumns = [
   { name: "label", label: "Group name", field: "label", align: "left", sortable: true },
@@ -1099,11 +1134,6 @@ const pledgeColumns = [
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value || 0);
-}
-
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString();
 }
 
 function formatDateTime(value) {
@@ -1634,6 +1664,13 @@ onMounted(loadDashboard);
   > [class*="col-"] {
     display: flex;
   }
+}
+
+.event-dashboard__day-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 12px;
 }
 
 .event-stat-card {

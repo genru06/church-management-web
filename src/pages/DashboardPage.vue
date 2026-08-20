@@ -40,7 +40,7 @@
             <q-badge :color="statusColor(event.status)" :label="event.status" />
           </div>
           <p class="dashboard-upcoming__meta">
-            {{ formatEventDate(event.eventDate) }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}
+            {{ formatEventDates(event, "Date TBA") }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}
           </p>
           <div class="dashboard-upcoming__stats">
             <div class="dashboard-upcoming__stat">
@@ -86,6 +86,7 @@ import { api } from "src/boot/axios";
 import MemberFormDialog from "src/components/MemberFormDialog.vue";
 import LifeGroupFormDialog from "src/components/LifeGroupFormDialog.vue";
 import { formatEventTime } from "src/utils/eventTime";
+import { formatEventDates } from "src/utils/eventDates";
 
 const router = useRouter();
 const stats = ref({
@@ -134,13 +135,6 @@ function onMemberSaved() {
 
 function onLifeGroupSaved() {
   stats.value.totalLifeGroups += 1;
-}
-
-function formatEventDate(value) {
-  if (!value) return "Date TBA";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function formatCount(value) {

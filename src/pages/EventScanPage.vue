@@ -11,7 +11,8 @@
       <div class="event-scan-page__intro">
         <h2>{{ event?.name || "Event check-in" }}</h2>
         <p>
-          Scan a member QR code to mark attendance.
+          Scan a member QR code to mark attendance
+          <template v-if="selectedSession"> for {{ formatSessionOption(selectedSession) }}</template>.
           <span v-if="event?.requiresPreRegistration">
             Pre-registration is required for this event.
           </span>
@@ -19,6 +20,9 @@
             Pre-registration is not required — walk-ins are checked in automatically.
           </span>
         </p>
+        <div v-if="sessions.length > 1" class="event-scan-page__days">
+          <EventDaySelector v-model="selectedSessionId" :sessions="sessions" />
+        </div>
         <q-banner
           v-if="hasRegistrationFee"
           dense
@@ -61,7 +65,7 @@
           <q-icon :name="checkInResult?.alreadyCheckedIn ? 'info' : 'check_circle'" :color="checkInResult?.alreadyCheckedIn ? 'warning' : 'positive'" size="48px" />
           <h3 class="q-mt-md q-mb-xs">{{ checkInResult?.fullName }}</h3>
           <EventScanPlacement :placement="checkInPlacement" />
-          <p>{{ checkInResult?.alreadyCheckedIn ? "Already checked in." : "Attendance recorded successfully." }}</p>
+          <p>{{ checkInResultMessage }}</p>
         </q-card-section>
         <q-card-actions vertical align="stretch" class="q-px-md q-pb-md">
           <q-btn
@@ -144,7 +148,9 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import EventScanPlacement from "src/components/EventScanPlacement.vue";
+import EventDaySelector from "src/components/EventDaySelector.vue";
 import { eventHasRegistrationFee, participantPlacement } from "src/utils/participantTags";
+import { eventSessions, formatSessionOption, pickDefaultSession } from "src/utils/eventDates";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -169,10 +175,22 @@ const unpaidDialogOpen = ref(false);
 const unpaidMessage = ref("");
 const unpaidParticipant = ref(null);
 const pendingCheckInBody = ref(null);
+const selectedSessionId = ref(null);
 
+const sessions = computed(() => eventSessions(event.value));
+const selectedSession = computed(
+  () => sessions.value.find((session) => String(session.id) === String(selectedSessionId.value)) || sessions.value[0] || null
+);
 const hasRegistrationFee = computed(() => eventHasRegistrationFee(event.value));
 const checkInPlacement = computed(() => participantPlacement(checkInResult.value));
 const unpaidPlacement = computed(() => participantPlacement(unpaidParticipant.value));
+const checkInResultMessage = computed(() => {
+  const day = checkInResult.value?.sessionLabel || selectedSession.value?.label;
+  if (checkInResult.value?.alreadyCheckedIn) {
+    return day ? `Already checked in for ${day}.` : "Already checked in.";
+  }
+  return day ? `Attendance recorded for ${day}.` : "Attendance recorded successfully.";
+});
 
 let scanner = null;
 let scanBusy = false;
@@ -249,6 +267,7 @@ async function submitCheckIn(body, { overrideUnpaid = false } = {}) {
   pendingCheckInBody.value = body;
   const { data } = await api.post(`/events/${eventId}/checkin`, {
     ...body,
+    sessionId: selectedSessionId.value,
     ...(overrideUnpaid ? { overrideUnpaid: true } : {})
   });
   await showCheckInResult(data);
@@ -407,7 +426,9 @@ async function cancelAttendance() {
 
   cancelling.value = true;
   try {
-    await api.post(`/events/${eventId}/checkin/${participantId}/cancel`);
+    await api.post(`/events/${eventId}/checkin/${participantId}/cancel`, {
+      sessionId: selectedSessionId.value
+    });
     $q.notify({
       type: "positive",
       message: `Attendance cancelled for ${checkInResult.value?.fullName || "participant"}.`
@@ -462,6 +483,7 @@ onMounted(async () => {
   try {
     const { data } = await api.get(`/events/${eventId}`);
     event.value = data;
+    selectedSessionId.value = pickDefaultSession(eventSessions(data), route.query.session)?.id ?? null;
     await startScanner();
   } catch {
     $q.notify({ type: "negative", message: "Failed to load event." });
@@ -487,6 +509,10 @@ onUnmounted(stopScanner);
     font-size: 0.8rem;
     color: #6b7280;
   }
+}
+
+.event-scan-page__days {
+  margin-top: 10px;
 }
 
 .event-scan-page__paid-note {

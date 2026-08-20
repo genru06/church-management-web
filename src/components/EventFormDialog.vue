@@ -49,8 +49,47 @@
                   hide-bottom-space
                 />
               </div>
-              <div class="col-12 col-sm-4">
-                <q-input v-model="form.eventDate" type="date" label="Event date" dense outlined hide-bottom-space />
+              <div class="col-12">
+                <div class="event-form-dates">
+                  <q-input
+                    v-model="dateToAdd"
+                    type="date"
+                    label="Add event date"
+                    dense
+                    outlined
+                    hide-bottom-space
+                    hint="Add one or more dates. Each date gets its own attendance sheet."
+                    @keyup.enter.prevent="addEventDate"
+                  >
+                    <template #append>
+                      <q-btn
+                        flat
+                        dense
+                        no-caps
+                        color="primary"
+                        icon="add"
+                        label="Add"
+                        :disable="!dateToAdd"
+                        @click="addEventDate"
+                      />
+                    </template>
+                  </q-input>
+                  <div v-if="sortedEventDates.length" class="event-form-dates__chips">
+                    <q-chip
+                      v-for="(date, index) in sortedEventDates"
+                      :key="date"
+                      removable
+                      color="primary"
+                      text-color="white"
+                      @remove="removeEventDate(date)"
+                    >
+                      Day {{ index + 1 }} · {{ formatEventDate(date) }}
+                    </q-chip>
+                  </div>
+                  <p v-else class="entity-table__muted q-mb-none" style="font-size: 0.78rem">
+                    No dates selected yet.
+                  </p>
+                </div>
               </div>
               <div class="col-12 col-sm-4">
                 <q-input
@@ -216,6 +255,7 @@ import {
   normalizeEventTime,
   toQuasarTimeValue
 } from "src/utils/eventTime";
+import { eventDateValues, formatEventDate, toDateOnly } from "src/utils/eventDates";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -249,7 +289,7 @@ const typeOptions = [
 
 const emptyForm = () => ({
   name: "",
-  eventDate: "",
+  eventDates: [],
   eventTime: "",
   location: "",
   description: "",
@@ -266,11 +306,30 @@ const emptyForm = () => ({
 });
 
 const form = ref(emptyForm());
+const dateToAdd = ref("");
 
 const quasarTimeValue = computed(() => toQuasarTimeValue(form.value.eventTime));
+const sortedEventDates = computed(() =>
+  [...(form.value.eventDates || [])].filter(Boolean).sort()
+);
 
 function onTimePicked(value) {
   form.value.eventTime = fromQuasarTimeValue(value);
+}
+
+function addEventDate() {
+  const date = toDateOnly(dateToAdd.value);
+  if (!date) return;
+  if ((form.value.eventDates || []).includes(date)) {
+    $q.notify({ type: "warning", message: "That date is already added." });
+    return;
+  }
+  form.value.eventDates = [...(form.value.eventDates || []), date].sort();
+  dateToAdd.value = "";
+}
+
+function removeEventDate(date) {
+  form.value.eventDates = (form.value.eventDates || []).filter((value) => value !== date);
 }
 
 function close() {
@@ -280,6 +339,7 @@ function close() {
 
 function resetForm() {
   form.value = emptyForm();
+  dateToAdd.value = "";
   formRef.value?.resetValidation();
 }
 
@@ -294,7 +354,7 @@ async function loadEvent() {
     const { data } = await api.get(`/events/${props.eventId}`);
     form.value = {
       name: data.name || "",
-      eventDate: data.eventDate || "",
+      eventDates: eventDateValues(data),
       eventTime: normalizeEventTime(data.eventTime),
       location: data.location || "",
       description: data.description || "",
@@ -330,6 +390,8 @@ async function submit() {
   try {
     const payload = {
       ...form.value,
+      eventDates: sortedEventDates.value,
+      eventDate: sortedEventDates.value[0] || null,
       tags: form.value.tags.join(", "),
       eventTime: normalizeEventTime(form.value.eventTime)
     };
@@ -372,3 +434,18 @@ watch(
   }
 );
 </script>
+
+<style scoped lang="scss">
+.event-form-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-form-dates__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+</style>
+

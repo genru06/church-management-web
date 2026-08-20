@@ -65,7 +65,7 @@
 
         <template #body-cell-eventDate="props">
           <q-td :props="props">
-            <span class="entity-table__muted">{{ formatDate(props.row.eventDate) }}</span>
+            <span class="entity-table__muted">{{ formatEventDates(props.row) }}</span>
           </q-td>
         </template>
 
@@ -164,6 +164,7 @@ import {
   isRegistrationOpen
 } from "src/utils/eventRegistration";
 import { formatEventTime } from "src/utils/eventTime";
+import { formatEventDates } from "src/utils/eventDates";
 
 const $q = useQuasar();
 const auth = useAuthStore();
@@ -210,11 +211,6 @@ function copyRegistrationLink(row) {
   if (!isRegistrationOpen(row)) return;
   navigator.clipboard?.writeText(getEventSignupUrl(row.id));
   $q.notify({ type: "positive", message: "Registration link copied to clipboard." });
-}
-
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString();
 }
 
 function formatCurrency(value) {

@@ -10,7 +10,7 @@
         <h1>Event registration</h1>
         <p>{{ signupInfo.event.name }}</p>
         <p class="event-signup-page__meta">
-          {{ formatDate(signupInfo.event.eventDate) }} · {{ formatEventTime(signupInfo.event.eventTime) }} · {{ signupInfo.event.location }}
+          {{ formatEventDates(signupInfo.event) }} · {{ formatEventTime(signupInfo.event.eventTime) }} · {{ signupInfo.event.location }}
         </p>
       </header>
 
@@ -110,6 +110,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { formatEventTime } from "src/utils/eventTime";
+import { formatEventDates } from "src/utils/eventDates";
 import AppSelect from "src/components/AppSelect.vue";
 
 const props = defineProps({
@@ -153,11 +154,6 @@ const filteredLifegroupOptions = computed(() => {
     (option) => !option.churchId || option.churchId === form.value.churchId
   );
 });
-
-function formatDate(value) {
-  if (!value) return "Date TBA";
-  return new Date(value).toLocaleDateString();
-}
 
 function onChurchChange(churchId) {
   form.value.reservationId = null;

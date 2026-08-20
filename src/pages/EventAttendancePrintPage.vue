@@ -26,7 +26,7 @@
           <h2 class="attendance-print-page__event">{{ event.name }}</h2>
         </div>
         <p class="attendance-print-page__meta">
-          {{ formatDate(event.eventDate) }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}
+          {{ printDateLabel }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}
           <template v-if="groupFilterLabel"> · {{ groupFilterLabel }}</template>
           <template v-if="tagLabel">
             · {{ excludeTags ? "Excluding tag" : "Tag" }}{{ tagFilter.length > 1 ? "s" : "" }}: {{ tagLabel }}
@@ -77,6 +77,13 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { formatEventTime } from "src/utils/eventTime";
+import {
+  eventSessions,
+  formatEventDates,
+  formatSessionOption,
+  pickDefaultSession,
+  withSessionAttendance
+} from "src/utils/eventDates";
 import {
   eventHasRegistrationFee,
   filterParticipantsByAttendance,
@@ -136,6 +143,12 @@ const churchFilterId = computed(() => {
   const value = Number(churchKey.value);
   return Number.isInteger(value) && value > 0 ? value : null;
 });
+const sessionFilterId = computed(() => {
+  const raw = route.query.session;
+  if (raw == null || raw === "") return null;
+  const value = Number(Array.isArray(raw) ? raw[0] : raw);
+  return Number.isFinite(value) ? value : null;
+});
 
 const loading = ref(false);
 const event = ref(null);
@@ -144,7 +157,8 @@ const qrByParticipant = ref({});
 const hasRegistrationFee = computed(() => eventHasRegistrationFee(event.value));
 
 const participants = computed(() => {
-  let rows = [...allParticipants.value];
+  const selectedSession = pickDefaultSession(eventSessions(event.value), sessionFilterId.value);
+  let rows = withSessionAttendance(allParticipants.value, selectedSession?.id);
 
   const inferredSource =
     sourceFilter.value ||
@@ -226,14 +240,13 @@ const attendanceStatusLabel = computed(() => {
   return "";
 });
 
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
-}
+const printDateLabel = computed(() => {
+  const selectedSession = pickDefaultSession(eventSessions(event.value), sessionFilterId.value);
+  if (selectedSession && eventSessions(event.value).length > 1) {
+    return formatSessionOption(selectedSession);
+  }
+  return formatEventDates(event.value);
+});
 
 function goBack() {
   router.push(`/events/${eventId}/attendance`);

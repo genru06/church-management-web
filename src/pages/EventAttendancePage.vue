@@ -3,7 +3,7 @@
     <header class="entity-page__header">
       <div class="entity-page__heading">
         <q-btn flat dense round icon="arrow_back" color="grey-7" @click="router.push(`/events/${eventId}`)" />
-        <h1 class="entity-page__title">Attendance sheet</h1>
+        <h1 class="entity-page__title">{{ sheetTitle }}</h1>
       </div>
       <div class="entity-page__actions">
         <q-btn
@@ -23,7 +23,7 @@
           color="primary"
           icon="qr_code_scanner"
           label="Open scanner"
-          @click="router.push(`/events/${eventId}/scan`)"
+          @click="openScanner"
         />
       </div>
     </header>
@@ -35,7 +35,24 @@
     <section v-if="event" class="entity-page__panel q-mb-md">
       <div class="attendance-sheet__event">
         <h2>{{ event.name }}</h2>
-        <p>{{ formatDate(event.eventDate) }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}</p>
+        <p>{{ formatEventDates(event) }} · {{ formatEventTime(event.eventTime) }} · {{ event.location }}</p>
+      </div>
+      <div v-if="sessions.length > 1" class="attendance-sheet__days">
+        <EventDaySelector v-model="selectedSessionId" :sessions="sessions" />
+        <div class="attendance-sheet__compare">
+          <button
+            v-for="stat in sessionStats"
+            :key="stat.id || stat.sessionDate"
+            type="button"
+            class="attendance-sheet__compare-card"
+            :class="{ 'attendance-sheet__compare-card--active': String(stat.id) === String(selectedSessionId) }"
+            @click="selectedSessionId = stat.id"
+          >
+            <span class="attendance-sheet__compare-label">{{ stat.label }}</span>
+            <span class="attendance-sheet__compare-value">{{ stat.attendedCount }}</span>
+            <span class="attendance-sheet__compare-hint">{{ stat.attendanceRate }}% present</span>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -327,8 +344,17 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import AppSelect from "src/components/AppSelect.vue";
+import EventDaySelector from "src/components/EventDaySelector.vue";
 import { compareChurchNamesMainFirst } from "src/utils/churchDisplay";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
+import {
+  eventSessions,
+  formatEventDates,
+  formatSessionOption,
+  pickDefaultSession,
+  sessionAttendanceCounts,
+  withSessionAttendance
+} from "src/utils/eventDates";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { formatEventTime } from "src/utils/eventTime";
 import {
@@ -368,6 +394,21 @@ const selectedReservationId = ref(null);
 const qrDialogOpen = ref(false);
 const selectedParticipant = ref(null);
 const selectedQrUrl = ref("");
+const selectedSessionId = ref(null);
+
+const sessions = computed(() => eventSessions(event.value));
+const selectedSession = computed(
+  () => sessions.value.find((session) => String(session.id) === String(selectedSessionId.value)) || sessions.value[0] || null
+);
+const sheetTitle = computed(() =>
+  selectedSession.value && sessions.value.length > 1
+    ? `Attendance sheet · ${formatSessionOption(selectedSession.value)}`
+    : "Attendance sheet"
+);
+const sessionParticipants = computed(() =>
+  withSessionAttendance(participants.value, selectedSessionId.value)
+);
+const sessionStats = computed(() => sessionAttendanceCounts(participants.value, sessions.value));
 
 const tagModeOptions = [
   { label: "Include", value: "include" },
@@ -441,7 +482,7 @@ const reservationOptions = computed(() =>
 );
 
 const filteredParticipants = computed(() => {
-  let rows = filterParticipantsByGroup(participants.value, {
+  let rows = filterParticipantsByGroup(sessionParticipants.value, {
     source: groupSource.value,
     churchId: selectedChurchId.value,
     lifeGroupId: selectedLifeGroupId.value,
@@ -530,14 +571,16 @@ function tagColor(tag) {
   return paymentTagColor(tag) || "grey-7";
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString();
-}
-
 function formatDateTime(value) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
+}
+
+function openScanner() {
+  const query = selectedSessionId.value != null && selectedSessionId.value !== ""
+    ? `?session=${selectedSessionId.value}`
+    : "";
+  router.push(`/events/${eventId}/scan${query}`);
 }
 
 function printFiltered() {
@@ -556,7 +599,8 @@ function printFiltered() {
       tags: tagFilter.value,
       search: participantFilter.value,
       excludeTags: tagMode.value === "exclude",
-      attendanceStatus: attendanceStatus.value
+      attendanceStatus: attendanceStatus.value,
+      sessionId: selectedSessionId.value
     })
   );
 }
@@ -576,7 +620,8 @@ async function manualCheckIn(participant) {
   try {
     const { data } = await api.post(`/events/${eventId}/checkin`, {
       participantId: participant.id,
-      token: participant.qrToken
+      token: participant.qrToken,
+      sessionId: selectedSessionId.value
     });
     const index = participants.value.findIndex((p) => p.id === participant.id);
     if (index >= 0) participants.value[index] = data;
@@ -588,7 +633,9 @@ async function manualCheckIn(participant) {
 
 async function revokePresent(participant) {
   try {
-    const { data } = await api.post(`/events/${eventId}/checkin/${participant.id}/cancel`);
+    const { data } = await api.post(`/events/${eventId}/checkin/${participant.id}/cancel`, {
+      sessionId: selectedSessionId.value
+    });
     const index = participants.value.findIndex((p) => p.id === participant.id);
     if (index >= 0) participants.value[index] = data;
     $q.notify({ type: "positive", message: `${participant.fullName} marked absent.` });
@@ -608,6 +655,8 @@ async function loadAttendance() {
     event.value = eventRes.data;
     participants.value = participantsRes.data;
     reservations.value = reservationsRes.data || [];
+    const nextSession = pickDefaultSession(eventSessions(eventRes.data), route.query.session);
+    selectedSessionId.value = nextSession?.id ?? null;
     await loadQrCodes(participantsRes.data);
   } catch {
     $q.notify({ type: "negative", message: "Failed to load attendance sheet." });
@@ -616,6 +665,18 @@ async function loadAttendance() {
     loading.value = false;
   }
 }
+
+watch(selectedSessionId, (sessionId) => {
+  const current = route.query.session != null ? String(route.query.session) : "";
+  const next = sessionId != null && sessionId !== "" ? String(sessionId) : "";
+  if (current === next) return;
+  router.replace({
+    query: {
+      ...route.query,
+      ...(next ? { session: next } : { session: undefined })
+    }
+  });
+});
 
 watch(tagFilter, (tags) => {
   if (!tags.length && tagMode.value === "exclude") {
@@ -651,6 +712,55 @@ onMounted(loadAttendance);
     font-size: 0.8rem;
     color: #6b7280;
   }
+}
+
+.attendance-sheet__days {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attendance-sheet__compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.attendance-sheet__compare-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid #e4e8ef;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.attendance-sheet__compare-card--active {
+  border-color: #1976d2;
+  box-shadow: 0 1px 6px rgba(25, 118, 210, 0.12);
+}
+
+.attendance-sheet__compare-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b93a1;
+}
+
+.attendance-sheet__compare-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.attendance-sheet__compare-hint {
+  font-size: 0.72rem;
+  color: #6b7280;
 }
 
 .attendance-sheet__toolbar {

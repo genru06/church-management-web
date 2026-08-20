@@ -18,7 +18,7 @@
         </div>
         <div class="entity-details__item">
           <dt class="entity-details__label">Event date</dt>
-          <dd class="entity-details__value">{{ formatDate(event.eventDate) }} · {{ formatEventTime(event.eventTime) }}</dd>
+          <dd class="entity-details__value">{{ formatEventDates(event) }} · {{ formatEventTime(event.eventTime) }}</dd>
         </div>
         <div class="entity-details__item">
           <dt class="entity-details__label">Location</dt>
@@ -69,6 +69,7 @@ import { useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { formatEventTime } from "src/utils/eventTime";
+import { formatEventDates } from "src/utils/eventDates";
 
 const props = defineProps({
   id: { type: [String, Number], required: true },
@@ -89,11 +90,6 @@ const reference = ref("");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value || 0);
-}
-
-function formatDate(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString();
 }
 
 async function submitPayment() {

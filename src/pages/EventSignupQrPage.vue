@@ -10,7 +10,7 @@
         <h1>Scan to register</h1>
         <p>{{ signupInfo.event.name }}</p>
         <p class="event-signup-qr-page__meta">
-          {{ formatDate(signupInfo.event.eventDate) }} · {{ formatEventTime(signupInfo.event.eventTime) }}
+          {{ formatEventDates(signupInfo.event) }} · {{ formatEventTime(signupInfo.event.eventTime) }}
         </p>
       </header>
 
@@ -38,6 +38,7 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import EventRegistrationQrCard from "src/components/EventRegistrationQrCard.vue";
 import { formatEventTime } from "src/utils/eventTime";
+import { formatEventDates } from "src/utils/eventDates";
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -49,11 +50,6 @@ const eventId = props.id || route.params.id;
 
 const loading = ref(false);
 const signupInfo = ref(null);
-
-function formatDate(value) {
-  if (!value) return "Date TBA";
-  return new Date(value).toLocaleDateString();
-}
 
 onMounted(async () => {
   loading.value = true;

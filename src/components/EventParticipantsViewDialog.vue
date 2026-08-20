@@ -169,10 +169,14 @@
 
             <template #body-cell-attendedAt="props">
               <q-td :props="props">
-                <q-badge
-                  :color="props.row.attendedAt ? 'positive' : 'grey'"
-                  :label="props.row.attendedAt ? 'Present' : 'Absent'"
-                />
+                <div class="participants-view-dialog__attendance">
+                  <q-badge
+                    v-for="item in sessionAttendance(props.row)"
+                    :key="item.label"
+                    :color="item.present ? 'positive' : 'grey'"
+                    :label="item.label"
+                  />
+                </div>
               </q-td>
             </template>
 
@@ -278,7 +282,7 @@
                     <span>
                       · {{ selectedGroup.adultCount || 0 }} adults · {{ selectedGroup.kidsCount || 0 }} kids
                     </span>
-                    <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
+                    <span v-if="groupAttendanceLabel(selectedGroup)"> · {{ groupAttendanceLabel(selectedGroup) }}</span>
                   </p>
                 </div>
                 <div class="participants-view-dialog__detail-actions">
@@ -360,10 +364,14 @@
 
                 <template #body-cell-attendedAt="props">
                   <q-td :props="props">
-                    <q-badge
-                      :color="props.row.attendedAt ? 'positive' : 'grey'"
-                      :label="props.row.attendedAt ? 'Present' : 'Absent'"
-                    />
+                    <div class="participants-view-dialog__attendance">
+                      <q-badge
+                        v-for="item in sessionAttendance(props.row)"
+                        :key="item.label"
+                        :color="item.present ? 'positive' : 'grey'"
+                        :label="item.label"
+                      />
+                    </div>
                   </q-td>
                 </template>
 
@@ -540,7 +548,7 @@
                     <span v-if="selectedGroup.isReservation">
                       · {{ selectedGroup.reservedCount }} reserved
                     </span>
-                    <span v-if="selectedGroup.attendedCount"> · {{ selectedGroup.attendedCount }} attended</span>
+                    <span v-if="groupAttendanceLabel(selectedGroup)"> · {{ groupAttendanceLabel(selectedGroup) }}</span>
                   </p>
                 </div>
                 <div class="participants-view-dialog__detail-actions">
@@ -628,10 +636,14 @@
 
                 <template #body-cell-attendedAt="props">
                   <q-td :props="props">
-                    <q-badge
-                      :color="props.row.attendedAt ? 'positive' : 'grey'"
-                      :label="props.row.attendedAt ? 'Present' : 'Absent'"
-                    />
+                    <div class="participants-view-dialog__attendance">
+                      <q-badge
+                        v-for="item in sessionAttendance(props.row)"
+                        :key="item.label"
+                        :color="item.present ? 'positive' : 'grey'"
+                        :label="item.label"
+                      />
+                    </div>
                   </q-td>
                 </template>
 
@@ -1147,6 +1159,7 @@ import PageMetricBar from "src/components/PageMetricBar.vue";
 import { buildCheckInPayload, generateQrDataUrl } from "src/utils/eventQr";
 import { exportParticipantsToExcel } from "src/utils/eventParticipantExcel";
 import { getAttendancePrintUrl } from "src/utils/eventAttendancePrint";
+import { attendanceForSession, eventSessions, sessionAttendanceCounts } from "src/utils/eventDates";
 import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
 import {
   filterParticipantsBySearch,
@@ -1176,6 +1189,7 @@ const emit = defineEmits(["update:modelValue", "linked", "deleted", "updated"]);
 const $q = useQuasar();
 const router = useRouter();
 const viewMode = ref("all");
+const sessions = computed(() => eventSessions(props.event));
 const qrByParticipant = ref({});
 const selectedKey = ref(null);
 const participantFilter = ref("");
@@ -1312,6 +1326,33 @@ function displayTags(participant) {
   const tags = participantTagNames(participant, tagNameOptions.value);
   if (!paidView.value) return tags;
   return tags.filter((tag) => !isPaymentTag(tag));
+}
+
+function sessionAttendance(participant) {
+  const list = sessions.value;
+  if (list.length <= 1) {
+    return [
+      {
+        label: participant.attendedAt ? "Present" : "Absent",
+        present: !!participant.attendedAt
+      }
+    ];
+  }
+  return list.map((session) => {
+    const present = !!attendanceForSession(participant, session.id);
+    return {
+      label: `${session.label}: ${present ? "Present" : "Absent"}`,
+      present
+    };
+  });
+}
+
+function groupAttendanceLabel(group) {
+  const stats = sessionAttendanceCounts(group?.participants || [], sessions.value);
+  if (stats.length > 1) {
+    return stats.map((stat) => `${stat.label}: ${stat.attendedCount}`).join(" · ");
+  }
+  return group?.attendedCount ? `${group.attendedCount} attended` : "";
 }
 
 function tagColor(tag) {
@@ -2122,7 +2163,8 @@ function selectGroup(group) {
 function exportGroup(group) {
   exportParticipantsToExcel(group.participants, {
     churchName: group.title,
-    eventName: props.event?.name
+    eventName: props.event?.name,
+    event: props.event
   });
   $q.notify({ type: "positive", message: `Exported ${group.title} participants.` });
 }
@@ -2550,7 +2592,8 @@ watch(
   margin-left: auto;
 }
 
-.participants-view-dialog__tags {
+.participants-view-dialog__tags,
+.participants-view-dialog__attendance {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;

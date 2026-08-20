@@ -1,13 +1,12 @@
 import * as XLSX from "xlsx";
+import { attendanceForSession, eventSessions, formatEventDate } from "./eventDates";
 
 const EXPORT_COLUMNS = [
   { key: "lastName", header: "Last name" },
   { key: "firstName", header: "First name" },
   { key: "lifegroupName", header: "LifeGroup" },
   { key: "email", header: "Email" },
-  { key: "phone", header: "Phone" },
-  { key: "attended", header: "Attended" },
-  { key: "attendedAt", header: "Attended at" }
+  { key: "phone", header: "Phone" }
 ];
 
 function sanitizeFilename(value) {
@@ -22,17 +21,33 @@ function formatAttendedAt(value) {
   return new Date(value).toLocaleString();
 }
 
-export function exportParticipantsToExcel(participants, { churchName, eventName }) {
+export function exportParticipantsToExcel(participants, { churchName, eventName, event } = {}) {
+  const sessions = eventSessions(event);
   const headers = EXPORT_COLUMNS.map((col) => col.header);
-  const rows = participants.map((participant) => [
-    participant.lastName || "",
-    participant.firstName || "",
-    participant.lifegroupName || "",
-    participant.email || "",
-    participant.phone || "",
-    participant.attendedAt ? "Yes" : "No",
-    formatAttendedAt(participant.attendedAt)
-  ]);
+  if (sessions.length > 1) {
+    sessions.forEach((session) => {
+      headers.push(`${session.label} (${formatEventDate(session.sessionDate)})`);
+    });
+  } else {
+    headers.push("Attended", "Attended at");
+  }
+
+  const rows = participants.map((participant) => {
+    const base = [
+      participant.lastName || "",
+      participant.firstName || "",
+      participant.lifegroupName || "",
+      participant.email || "",
+      participant.phone || ""
+    ];
+    if (sessions.length > 1) {
+      return [
+        ...base,
+        ...sessions.map((session) => (attendanceForSession(participant, session.id) ? "Yes" : "No"))
+      ];
+    }
+    return [...base, participant.attendedAt ? "Yes" : "No", formatAttendedAt(participant.attendedAt)];
+  });
 
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   worksheet["!cols"] = headers.map((header) => ({ wch: Math.max(header.length + 2, 14) }));

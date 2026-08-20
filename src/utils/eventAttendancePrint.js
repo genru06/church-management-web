@@ -9,7 +9,8 @@ export function getAttendancePrintUrl(
     excludeTags = false,
     attendanceStatus,
     lifeGroupId,
-    source
+    source,
+    sessionId
   } = {}
 ) {
   const base = `/events/${eventId}/attendance/print`;
@@ -17,6 +18,10 @@ export function getAttendancePrintUrl(
 
   if (source) {
     params.set("source", String(source));
+  }
+
+  if (sessionId != null && sessionId !== "") {
+    params.set("session", String(sessionId));
   }
 
   if (churchKey) {
