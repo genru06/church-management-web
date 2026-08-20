@@ -50,6 +50,7 @@
         :filter-method="filterParticipants"
         :pagination="{ rowsPerPage: 25 }"
         class="entity-table"
+        @row-click="onAttendanceRowClick"
       >
         <template #top>
           <div class="attendance-sheet__toolbar">
@@ -178,10 +179,17 @@
         </template>
 
         <template #body-cell-fullName="props">
-          <q-td :props="props">
-            <button type="button" class="entity-table__link" @click="openParticipantQrDialog(props.row)">
-              {{ props.row.fullName }}
-            </button>
+          <q-td :props="props" class="attendance-sheet__name-cell">
+            <q-btn
+              flat
+              dense
+              no-caps
+              padding="xs"
+              color="primary"
+              class="attendance-sheet__name-btn"
+              :label="props.row.fullName || '—'"
+              @click.stop="openParticipantQrDialog(props.row)"
+            />
           </q-td>
         </template>
 
@@ -226,10 +234,14 @@
 
         <template #body-cell-qrCode="props">
           <q-td :props="props">
-            <div class="attendance-sheet__qr">
+            <button
+              type="button"
+              class="attendance-sheet__qr"
+              @click.stop="openParticipantQrDialog(props.row)"
+            >
               <img v-if="qrByParticipant[props.row.id]" :src="qrByParticipant[props.row.id]" :alt="`QR for ${props.row.fullName}`" />
               <q-spinner v-else size="20px" color="primary" />
-            </div>
+            </button>
           </q-td>
         </template>
 
@@ -243,7 +255,7 @@
               size="sm"
               color="primary"
               label="Mark present"
-              @click="manualCheckIn(props.row)"
+              @click.stop="manualCheckIn(props.row)"
             />
             <q-btn
               v-else
@@ -253,7 +265,7 @@
               size="sm"
               color="negative"
               label="Revoke as present"
-              @click="revokePresent(props.row)"
+              @click.stop="revokePresent(props.row)"
             />
           </q-td>
         </template>
@@ -270,7 +282,7 @@
       </q-table>
     </section>
 
-    <q-dialog v-model="qrDialogOpen" @hide="resetParticipantQrDialog">
+    <q-dialog v-model="qrDialogOpen" persistent @hide="resetParticipantQrDialog">
       <q-card class="entity-dialog attendance-qr-dialog">
         <header class="entity-dialog__header">
           <div>
@@ -310,7 +322,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
@@ -482,10 +494,19 @@ function participantGroupLabel(participant) {
 
 let qrDialogSeq = 0;
 
+function onAttendanceRowClick(evt, row) {
+  if (evt?.target?.closest?.(".entity-table__actions")) return;
+  openParticipantQrDialog(row);
+}
+
 async function openParticipantQrDialog(participant) {
+  if (!participant) return;
+
   const seq = ++qrDialogSeq;
   selectedParticipant.value = participant;
   selectedQrUrl.value = qrByParticipant.value[participant.id] || "";
+
+  await nextTick();
   qrDialogOpen.value = true;
 
   try {
@@ -689,6 +710,26 @@ onMounted(loadAttendance);
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.attendance-sheet__name-cell {
+  cursor: pointer;
+}
+
+.attendance-sheet__name-btn {
+  min-height: 72px;
+  padding: 0 4px !important;
+  justify-content: flex-start;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.attendance-sheet__qr {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 
 .attendance-sheet__qr img {
