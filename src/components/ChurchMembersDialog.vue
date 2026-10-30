@@ -10,7 +10,19 @@
           <h2 class="entity-dialog__title">Members in {{ churchName || "this church" }}</h2>
           <p class="entity-dialog__subtitle">{{ rows.length }} member(s)</p>
         </div>
-        <q-btn flat round dense icon="close" color="grey-7" @click="close" />
+        <div class="church-members-dialog__header-actions">
+          <q-btn
+            dense
+            outline
+            no-caps
+            color="primary"
+            icon="print"
+            label="Print"
+            :disable="!churchId || !rows.length || loading"
+            @click="openPrintPage"
+          />
+          <q-btn flat round dense icon="close" color="grey-7" @click="close" />
+        </div>
       </header>
 
       <q-separator />
@@ -76,15 +88,26 @@
 
       <footer class="entity-dialog__footer">
         <q-btn flat no-caps label="Close" color="grey-8" @click="close" />
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          icon="print"
+          label="Print with QR"
+          :disable="!churchId || !rows.length || loading"
+          @click="openPrintPage"
+        />
       </footer>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
+import { LG_NETWORK_MEMBERS_FROM } from "src/utils/churchTags";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -95,8 +118,15 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const $q = useQuasar();
+const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 const rows = ref([]);
+
+const networkOnly = computed(() => {
+  const path = String(route.path || "");
+  return path.startsWith("/lg-network-churches") || route.query.from === LG_NETWORK_MEMBERS_FROM;
+});
 
 const columns = [
   { name: "lastName", label: "Last Name", field: "lastName", align: "left", sortable: true },
@@ -122,6 +152,17 @@ function close() {
   emit("update:modelValue", false);
 }
 
+function openPrintPage() {
+  if (!props.churchId) return;
+  const path = networkOnly.value
+    ? "/lg-network-churches/members/print"
+    : "/members/print";
+  router.push({
+    path,
+    query: { churchId: String(props.churchId) }
+  });
+}
+
 async function loadMembers() {
   if (!props.churchId) return;
 
@@ -144,6 +185,12 @@ async function loadMembers() {
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+}
+
+.church-members-dialog__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .church-members-dialog__body {
