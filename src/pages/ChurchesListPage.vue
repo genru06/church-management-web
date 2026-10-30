@@ -168,7 +168,7 @@ import { useAuthStore } from "src/stores/auth";
 import ChurchFormDialog from "src/components/ChurchFormDialog.vue";
 import ChurchDetailsDialog from "src/components/ChurchDetailsDialog.vue";
 import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
-import { getChurchesPrintUrl } from "src/utils/churchPrint";
+import { getMembersPrintUrl } from "src/utils/memberPrint";
 import { isLgNetworkChurch, LG_NETWORK_CHURCH_TAG } from "src/utils/churchTags";
 
 const props = defineProps({
@@ -234,9 +234,10 @@ const columns = [
 
 function openPrintPage(row = null) {
   router.push(
-    getChurchesPrintUrl({
+    getMembersPrintUrl({
       networkOnly: props.networkOnly,
-      churchId: row?.id || null
+      churchId: row?.id || null,
+      groupByChurch: !row?.id
     })
   );
 }

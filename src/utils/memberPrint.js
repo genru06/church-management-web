@@ -12,11 +12,23 @@ export function tagsForMemberApi(tags = []) {
   return (tags || []).filter((tag) => !isLifeGroupFilterTag(tag));
 }
 
-export function getMembersPrintUrl({ tags, lifeGroupId, networkOnly = false } = {}) {
+export function getMembersPrintUrl({
+  tags,
+  lifeGroupId,
+  churchId = null,
+  groupByChurch = false,
+  networkOnly = false
+} = {}) {
   const params = new URLSearchParams();
   (tags || []).forEach((tag) => params.append("tag", tag));
   if (lifeGroupId != null && lifeGroupId !== "") {
     params.set("lifeGroupId", String(lifeGroupId));
+  }
+  if (churchId != null && churchId !== "") {
+    params.set("churchId", String(churchId));
+  }
+  if (groupByChurch) {
+    params.set("groupBy", "church");
   }
   const query = params.toString();
   const path = networkOnly ? "/lg-network-churches/members/print" : "/members/print";
@@ -40,6 +52,33 @@ export function groupMembersByLifeGroup(members, { lifeGroupName } = {}) {
       members: sortMembers(members)
     }
   ].filter((group) => group.members.length);
+}
+
+export function groupMembersByChurch(members, { churchName } = {}) {
+  if (churchName) {
+    return [
+      {
+        key: `church:${String(churchName).toLowerCase()}`,
+        tagName: churchName,
+        members: sortMembers(members)
+      }
+    ].filter((group) => group.members.length);
+  }
+
+  const byName = new Map();
+  members.forEach((member) => {
+    const name = String(member.church || "").trim() || "Unassigned church";
+    const key = name.toLowerCase();
+    if (!byName.has(key)) {
+      byName.set(key, { key: `church:${key}`, tagName: name, members: [] });
+    }
+    byName.get(key).members.push(member);
+  });
+
+  return [...byName.values()]
+    .map((group) => ({ ...group, members: sortMembers(group.members) }))
+    .sort((a, b) => a.tagName.localeCompare(b.tagName, undefined, { sensitivity: "base" }))
+    .filter((group) => group.members.length);
 }
 
 export function groupMembersByTag(members, { tagFilter = [], allTagNames = [] } = {}) {

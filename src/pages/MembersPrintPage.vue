@@ -25,10 +25,15 @@
         <p v-if="lifeGroupFilterLabel" class="members-print-page__filter">
           LifeGroup: {{ lifeGroupFilterLabel }}
         </p>
+        <p v-else-if="churchFilterLabel" class="members-print-page__filter">
+          Church: {{ churchFilterLabel }}
+        </p>
         <p v-else-if="tagFilterLabel" class="members-print-page__filter">Tags: {{ tagFilterLabel }}</p>
         <p class="members-print-page__count">
           {{ totalMembers }} member(s)
           <template v-if="isLifeGroupPrint"> · 1 lifegroup</template>
+          <template v-else-if="isChurchPrint"> · 1 church</template>
+          <template v-else-if="isChurchGroupedPrint"> · {{ printGroups.length }} church(es)</template>
           <template v-else> · {{ printGroups.length }} tag group(s)</template>
         </p>
       </header>
@@ -49,7 +54,7 @@
               <th class="members-print-page__col-qr">QR Code</th>
               <th>Last Name</th>
               <th>First Name</th>
-              <th>Church</th>
+              <th v-if="!isChurchPrint && !isChurchGroupedPrint">Church</th>
               <th v-if="!isLifeGroupPrint">LifeGroup</th>
             </tr>
           </thead>
@@ -65,7 +70,7 @@
               </td>
               <td>{{ member.lastName || "—" }}</td>
               <td>{{ member.firstName || "—" }}</td>
-              <td>{{ member.church || "—" }}</td>
+              <td v-if="!isChurchPrint && !isChurchGroupedPrint">{{ member.church || "—" }}</td>
               <td v-if="!isLifeGroupPrint">{{ member.lifeGroup || "—" }}</td>
             </tr>
           </tbody>
@@ -84,12 +89,18 @@ import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { generateMemberQrDataUrl } from "src/utils/memberQr";
 import {
+  groupMembersByChurch,
   groupMembersByLifeGroup,
   groupMembersByTag,
   hasLifeGroupFilterTag,
   tagsForMemberApi
 } from "src/utils/memberPrint";
-import { LG_NETWORK_CHURCH_TAG, LG_NETWORK_MEMBERS_PATH } from "src/utils/churchTags";
+import {
+  LG_NETWORK_CHURCH_TAG,
+  LG_NETWORK_CHURCHES_PATH,
+  LG_NETWORK_MEMBERS_PATH
+} from "src/utils/churchTags";
+import { getChurchDisplayName } from "src/utils/churchDisplay";
 
 const props = defineProps({
   networkOnly: { type: Boolean, default: false }
@@ -103,6 +114,7 @@ const loading = ref(false);
 const members = ref([]);
 const allTagNames = ref([]);
 const lifeGroupName = ref("");
+const churchName = ref("");
 const qrByMember = ref({});
 
 function normalizeRouteTags(queryTag) {
@@ -128,7 +140,7 @@ function normalizeRouteTags(queryTag) {
   return tags;
 }
 
-function normalizeRouteLifeGroupId(queryValue) {
+function normalizeRouteId(queryValue) {
   if (queryValue == null || queryValue === "") return null;
   const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
   const id = Number(raw);
@@ -136,16 +148,33 @@ function normalizeRouteLifeGroupId(queryValue) {
 }
 
 const tagFilter = computed(() => normalizeRouteTags(route.query.tag));
-const lifeGroupId = computed(() => normalizeRouteLifeGroupId(route.query.lifeGroupId));
+const lifeGroupId = computed(() => normalizeRouteId(route.query.lifeGroupId));
+const churchId = computed(() => normalizeRouteId(route.query.churchId));
+const groupByChurch = computed(() => {
+  const raw = Array.isArray(route.query.groupBy) ? route.query.groupBy[0] : route.query.groupBy;
+  return String(raw || "").toLowerCase() === "church";
+});
 const isLifeGroupPrint = computed(
   () => hasLifeGroupFilterTag(tagFilter.value) && Boolean(lifeGroupId.value)
 );
+const isChurchPrint = computed(() => Boolean(churchId.value));
+const isChurchGroupedPrint = computed(() => !isChurchPrint.value && groupByChurch.value);
 
 const printGroups = computed(() => {
   if (isLifeGroupPrint.value) {
     return groupMembersByLifeGroup(members.value, {
       lifeGroupName: lifeGroupName.value
     });
+  }
+
+  if (isChurchPrint.value) {
+    return groupMembersByChurch(members.value, {
+      churchName: churchName.value
+    });
+  }
+
+  if (groupByChurch.value) {
+    return groupMembersByChurch(members.value);
   }
 
   return groupMembersByTag(members.value, {
@@ -169,12 +198,26 @@ const lifeGroupFilterLabel = computed(() => {
   return lifeGroupName.value || "Selected lifegroup";
 });
 
+const churchFilterLabel = computed(() => {
+  if (!isChurchPrint.value) return "";
+  return churchName.value || "Selected church";
+});
+
 const pageTitle = computed(() =>
   props.networkOnly ? "LG Network Church Member List" : "Member List"
 );
-const listPath = computed(() => (props.networkOnly ? LG_NETWORK_MEMBERS_PATH : "/members"));
+const listPath = computed(() => {
+  if (isChurchPrint.value || groupByChurch.value) {
+    return props.networkOnly ? LG_NETWORK_CHURCHES_PATH : "/churches";
+  }
+  return props.networkOnly ? LG_NETWORK_MEMBERS_PATH : "/members";
+});
 
 function goBack() {
+  if (isChurchPrint.value || groupByChurch.value) {
+    router.push(listPath.value);
+    return;
+  }
   const query = {};
   if (tagFilter.value.length) query.tag = tagFilter.value;
   if (isLifeGroupPrint.value) query.lifeGroupId = lifeGroupId.value;
@@ -209,6 +252,40 @@ async function loadQrCodes(rows) {
   qrByMember.value = Object.fromEntries(entries.filter(([, dataUrl]) => dataUrl));
 }
 
+async function loadMembersForChurch(id) {
+  const [churchRes, membersRes] = await Promise.all([
+    api.get(`/churches/${id}`),
+    api.get(`/churches/${id}/members`)
+  ]);
+  churchName.value = getChurchDisplayName(churchRes.data) || churchRes.data?.name || "Church";
+  return (membersRes.data || []).map((member) => ({
+    ...member,
+    church: member.church || churchName.value
+  }));
+}
+
+async function loadMembersGroupedByNetworkChurches() {
+  const params = props.networkOnly
+    ? { tag: LG_NETWORK_CHURCH_TAG }
+    : { excludeTag: LG_NETWORK_CHURCH_TAG };
+  const { data: churches } = await api.get("/churches", { params });
+  const lists = await Promise.all(
+    (churches || []).map(async (church) => {
+      const { data } = await api.get(`/churches/${church.id}/members`);
+      const label = getChurchDisplayName(church) || church.name || "Church";
+      return (data || []).map((member) => ({
+        ...member,
+        church: member.church || label
+      }));
+    })
+  );
+  const byId = new Map();
+  lists.flat().forEach((member) => {
+    if (!byId.has(member.id)) byId.set(member.id, member);
+  });
+  return [...byId.values()];
+}
+
 async function loadPrintSheet() {
   loading.value = true;
   try {
@@ -221,29 +298,45 @@ async function loadPrintSheet() {
       return;
     }
 
-    const params = {};
-    const apiTags = tagsForMemberApi(tagFilter.value);
-    if (apiTags.length) params.tag = apiTags;
-    if (lifeGroupId.value) params.lifeGroupId = lifeGroupId.value;
-    if (props.networkOnly) params.churchTag = LG_NETWORK_CHURCH_TAG;
+    let rows = [];
 
-    const requests = [
-      api.get("/tags"),
-      api.get("/members", {
-        params,
-        paramsSerializer: { indexes: null }
-      })
-    ];
+    if (churchId.value) {
+      rows = await loadMembersForChurch(churchId.value);
+      allTagNames.value = [];
+      lifeGroupName.value = "";
+    } else if (groupByChurch.value) {
+      rows = await loadMembersGroupedByNetworkChurches();
+      allTagNames.value = [];
+      lifeGroupName.value = "";
+      churchName.value = "";
+    } else {
+      const params = {};
+      const apiTags = tagsForMemberApi(tagFilter.value);
+      if (apiTags.length) params.tag = apiTags;
+      if (lifeGroupId.value) params.lifeGroupId = lifeGroupId.value;
+      if (props.networkOnly) params.churchTag = LG_NETWORK_CHURCH_TAG;
 
-    if (lifeGroupId.value) {
-      requests.push(api.get(`/lifegroups/${lifeGroupId.value}`));
+      const requests = [
+        api.get("/tags"),
+        api.get("/members", {
+          params,
+          paramsSerializer: { indexes: null }
+        })
+      ];
+
+      if (lifeGroupId.value) {
+        requests.push(api.get(`/lifegroups/${lifeGroupId.value}`));
+      }
+
+      const [tagsRes, membersRes, lifeGroupRes] = await Promise.all(requests);
+
+      allTagNames.value = tagsRes.data.map((tag) => tag.name);
+      lifeGroupName.value = lifeGroupRes?.data?.name || "";
+      churchName.value = "";
+      rows = membersRes.data || [];
     }
 
-    const [tagsRes, membersRes, lifeGroupRes] = await Promise.all(requests);
-
-    allTagNames.value = tagsRes.data.map((tag) => tag.name);
-    lifeGroupName.value = lifeGroupRes?.data?.name || "";
-    const withTokens = await ensureMemberQrTokens(membersRes.data);
+    const withTokens = await ensureMemberQrTokens(rows);
     members.value = withTokens;
 
     const printableMembers = printGroups.value.flatMap((group) => group.members);
