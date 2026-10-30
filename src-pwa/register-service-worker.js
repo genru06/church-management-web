@@ -28,11 +28,12 @@ register(process.env.SERVICE_WORKER_FILE, {
   },
 
   updated (/* registration */) {
-    // console.log('New content is available; please refresh.')
+    // New build is ready — reload once so Print and other UI changes appear.
+    window.location.reload()
   },
 
   offline () {
-    // console.log('No internet connection found. App is running in offline mode.')
+    // console.log('No internet connection found. App is running in offline use.')
   },
 
   error (/* err */) {

@@ -27,6 +27,19 @@
 
       <q-separator />
 
+      <q-card-section class="church-members-dialog__print-bar">
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          icon="print"
+          label="Print member list with QR"
+          class="full-width"
+          :disable="!churchId || !rows.length || loading"
+          @click="openPrintPage"
+        />
+      </q-card-section>
+
       <q-card-section class="church-members-dialog__body">
         <q-table
           :rows="rows"
@@ -191,6 +204,10 @@ async function loadMembers() {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.church-members-dialog__print-bar {
+  padding: 10px 16px 0;
 }
 
 .church-members-dialog__body {

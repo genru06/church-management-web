@@ -1,6 +1,15 @@
 # SPA fallback when mod_rewrite is unavailable
 ErrorDocument 404 /index.html
 
+<IfModule mod_headers.c>
+  # Always revalidate the shell + service worker so Print and other UI updates land.
+  <FilesMatch "^(index\.html|sw\.js|manifest\.json)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
