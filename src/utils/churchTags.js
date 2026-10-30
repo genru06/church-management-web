@@ -1,5 +1,6 @@
 export const LG_NETWORK_CHURCH_TAG = "LG Network Church";
 export const LG_NETWORK_CHURCHES_PATH = "/lg-network-churches";
+export const LG_NETWORK_CHURCHES_PRINT_PATH = "/lg-network-churches/print";
 export const LG_NETWORK_MEMBERS_PATH = "/lg-network-churches/members";
 export const LG_NETWORK_MEMBERS_PRINT_PATH = "/lg-network-churches/members/print";
 export const LG_NETWORK_MEMBERS_FROM = "lg-network-churches";

@@ -7,6 +7,7 @@ import MembersPrintPage from "src/pages/MembersPrintPage.vue";
 import MemberFormPage from "src/pages/MemberFormPage.vue";
 import MemberDetailsPage from "src/pages/MemberDetailsPage.vue";
 import ChurchesListPage from "src/pages/ChurchesListPage.vue";
+import ChurchesPrintPage from "src/pages/ChurchesPrintPage.vue";
 import ChurchFormPage from "src/pages/ChurchFormPage.vue";
 import ChurchDetailsPage from "src/pages/ChurchDetailsPage.vue";
 import LifeGroupsListPage from "src/pages/LifeGroupsListPage.vue";
@@ -84,10 +85,12 @@ const routes = [
       { path: "members/:id", component: MemberDetailsPage, props: true, meta: { page: "members" } },
       { path: "members/:id/edit", component: MemberFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "members" } },
       { path: "churches", component: ChurchesListPage, meta: { page: "churches" } },
+      { path: "churches/print", component: ChurchesPrintPage, meta: { page: "churches" } },
       { path: "churches/add", component: ChurchFormPage, props: { mode: "create" }, meta: { page: "churches" } },
       { path: "churches/:id", component: ChurchDetailsPage, props: true, meta: { page: "churches" } },
       { path: "churches/:id/edit", component: ChurchFormPage, props: route => ({ mode: "edit", id: route.params.id }), meta: { page: "churches" } },
       { path: "lg-network-churches", component: ChurchesListPage, props: { networkOnly: true }, meta: { page: "churches" } },
+      { path: "lg-network-churches/print", component: ChurchesPrintPage, props: { networkOnly: true }, meta: { page: "churches" } },
       { path: "lg-network-churches/members", component: MembersListPage, props: { networkOnly: true }, meta: { page: "members" } },
       { path: "lg-network-churches/members/print", component: MembersPrintPage, props: { networkOnly: true }, meta: { page: "members" } },
       { path: "lifegroups", component: LifeGroupsListPage, meta: { page: "lifegroups" } },

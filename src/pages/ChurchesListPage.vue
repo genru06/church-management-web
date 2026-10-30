@@ -18,6 +18,17 @@
           to="/lg-network-churches/members"
         />
         <q-btn
+          dense
+          outline
+          no-caps
+          color="primary"
+          icon="print"
+          label="Print list"
+          class="entity-page__add-btn"
+          :disable="!rows.length"
+          @click="openPrintPage()"
+        />
+        <q-btn
           v-if="auth.canDo('action.churches.create')"
           dense
           unelevated
@@ -108,6 +119,9 @@
 
         <template #body-cell-actions="props">
           <q-td :props="props" class="entity-table__actions">
+            <q-btn flat dense round size="sm" color="grey-7" icon="print" @click="openPrintPage(props.row)">
+              <q-tooltip>Print</q-tooltip>
+            </q-btn>
             <q-btn flat dense round size="sm" color="grey-7" icon="visibility" @click="openDetailsDialog(props.row)">
               <q-tooltip>View</q-tooltip>
             </q-btn>
@@ -147,12 +161,14 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import { useAuthStore } from "src/stores/auth";
 import ChurchFormDialog from "src/components/ChurchFormDialog.vue";
 import ChurchDetailsDialog from "src/components/ChurchDetailsDialog.vue";
 import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
+import { getChurchesPrintUrl } from "src/utils/churchPrint";
 import { isLgNetworkChurch, LG_NETWORK_CHURCH_TAG } from "src/utils/churchTags";
 
 const props = defineProps({
@@ -161,6 +177,7 @@ const props = defineProps({
 
 const auth = useAuthStore();
 const $q = useQuasar();
+const router = useRouter();
 const rows = ref([]);
 const filter = ref("");
 const loading = ref(false);
@@ -212,8 +229,17 @@ const columns = [
   { name: "address", label: "Address", field: "address", align: "left" },
   { name: "pastorName", label: "Pastor", field: "pastorName", align: "left", sortable: true },
   { name: "tags", label: "Tags", field: "tags", align: "left" },
-  { name: "actions", label: "", field: "actions", align: "right", style: "width: 96px" }
+  { name: "actions", label: "", field: "actions", align: "right", style: "width: 128px" }
 ];
+
+function openPrintPage(row = null) {
+  router.push(
+    getChurchesPrintUrl({
+      networkOnly: props.networkOnly,
+      churchId: row?.id || null
+    })
+  );
+}
 
 function openCreateDialog() {
   formMode.value = "create";
