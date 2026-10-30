@@ -73,6 +73,17 @@
                 {{ stats.kidsMemberCount }} Kids
               </span>
             </button>
+            <q-btn
+              unelevated
+              no-caps
+              color="primary"
+              icon="print"
+              label="Print members with QR"
+              class="full-width"
+              :disable="!stats.memberCount || !churchId"
+              @click="openMembersPrint"
+            />
+
             <button
               type="button"
               class="church-stat-card church-stat-card--clickable"
@@ -127,6 +138,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
 import ChurchMembersDialog from "src/components/ChurchMembersDialog.vue";
@@ -142,6 +154,8 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "edit"]);
 
 const $q = useQuasar();
+const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 const church = ref({});
 const membersDialogOpen = ref(false);
@@ -171,6 +185,15 @@ function onEdit() {
 function openMembersDialog() {
   if (!stats.value.memberCount) return;
   membersDialogOpen.value = true;
+}
+
+function openMembersPrint() {
+  if (!props.churchId || !stats.value.memberCount) return;
+  const networkOnly = String(route.path || "").startsWith("/lg-network-churches");
+  router.push({
+    path: networkOnly ? "/lg-network-churches/members/print" : "/members/print",
+    query: { churchId: String(props.churchId) }
+  });
 }
 
 function openLifeGroupsDialog() {

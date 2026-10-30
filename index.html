@@ -18,6 +18,27 @@
     <link rel="apple-touch-icon" sizes="120x120" href="/icons/apple-icon-120x120.png" />
   </head>
   <body>
+    <script>
+      // Clear stale Progressive Web App caches so UI updates (e.g. Print) can load.
+      (function () {
+        try {
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              regs.forEach(function (reg) {
+                reg.unregister();
+              });
+            });
+          }
+          if (window.caches && caches.keys) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (key) {
+                caches.delete(key);
+              });
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
     <!-- quasar:entry-point -->
   </body>
 </html>
