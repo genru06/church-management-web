@@ -83,7 +83,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { api } from "src/boot/axios";
@@ -351,6 +351,13 @@ async function loadPrintSheet() {
 }
 
 onMounted(loadPrintSheet);
+
+watch(
+  () => [churchId.value, groupByChurch.value, lifeGroupId.value, tagFilter.value.join("|")],
+  () => {
+    loadPrintSheet();
+  }
+);
 </script>
 
 <style scoped lang="scss">

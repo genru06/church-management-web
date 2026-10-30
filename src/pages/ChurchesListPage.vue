@@ -168,7 +168,6 @@ import { useAuthStore } from "src/stores/auth";
 import ChurchFormDialog from "src/components/ChurchFormDialog.vue";
 import ChurchDetailsDialog from "src/components/ChurchDetailsDialog.vue";
 import { compareChurchNamesMainFirst, getChurchDisplayName } from "src/utils/churchDisplay";
-import { getMembersPrintUrl } from "src/utils/memberPrint";
 import { isLgNetworkChurch, LG_NETWORK_CHURCH_TAG } from "src/utils/churchTags";
 
 const props = defineProps({
@@ -233,13 +232,15 @@ const columns = [
 ];
 
 function openPrintPage(row = null) {
-  router.push(
-    getMembersPrintUrl({
-      networkOnly: props.networkOnly,
-      churchId: row?.id || null,
-      groupByChurch: !row?.id
-    })
-  );
+  const churchId = row?.id != null ? String(row.id) : null;
+  const path = props.networkOnly
+    ? "/lg-network-churches/members/print"
+    : "/members/print";
+  const query = {};
+  if (churchId) query.churchId = churchId;
+  else query.groupBy = "church";
+  // Prefer path+query object so churchId always lands on MembersPrintPage.
+  router.push({ path, query });
 }
 
 function openCreateDialog() {
